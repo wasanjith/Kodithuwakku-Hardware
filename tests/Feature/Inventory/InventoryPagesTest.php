@@ -19,7 +19,7 @@ beforeEach(function () {
     $this->seed([CatalogSeeder::class, DocumentSequenceSeeder::class]);
     $this->owner = userWithRole(Role::SuperAdmin);
     $this->manager = userWithRole(Role::Manager);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->urea = createUrea(['reorder_level' => 100]);
     $this->stock = app(StockService::class);
 });
@@ -46,14 +46,14 @@ test('opening stock from the import is posted once as OPENING movements', functi
 
 test('stock pages render for the owner', function () {
     $this->stock->receive($this->urea, null, '50', '170');
-    $this->stock->receive(createProduct(['name' => 'Seeds', 'track_expiry' => true]), null, '5', '10', ['expiry_date' => now()->addDays(10)->toDateString()]);
+    $this->stock->receive(createProduct(['name' => 'Fasteners', 'track_expiry' => true]), null, '5', '10', ['expiry_date' => now()->addDays(10)->toDateString()]);
 
     $this->actingAs($this->owner);
 
     $this->get(route('inventory.stock.index'))->assertOk()->assertSee('Urea 50kg')->assertSee('Stock value at cost');
     $this->get(route('inventory.stock.index', ['view' => 'batches']))->assertOk()->assertSee('General stock');
     $this->get(route('inventory.stock.index', ['filter' => ['low' => '1']]))->assertOk()->assertSee('Urea 50kg');
-    $this->get(route('inventory.batches.expiry', ['days' => 30]))->assertOk()->assertSee('Seeds');
+    $this->get(route('inventory.batches.expiry', ['days' => 30]))->assertOk()->assertSee('Fasteners');
     $this->get(route('inventory.movements.index', ['product' => $this->urea->id]))->assertOk()->assertSee('Goods received');
     $this->get(route('catalog.products.show', $this->urea))->assertOk()->assertSee('Stock by batch');
     $this->get(route('catalog.products.index', ['filter' => ['low' => '1']]))->assertOk()->assertSee('Urea 50kg');
@@ -61,7 +61,7 @@ test('stock pages render for the owner', function () {
 
 test('the stock list shows each product brand and finds products by brand', function () {
     $this->urea->update(['brand_id' => Brand::create(['name' => 'Lanka Fertilizer'])->id]);
-    $other = createProduct(['name' => 'Okra 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
+    $other = createProduct(['name' => 'Okra 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet']);
     $this->stock->receive($this->urea, null, '50', '170');
     $this->stock->receive($other, null, '5', '70');
 

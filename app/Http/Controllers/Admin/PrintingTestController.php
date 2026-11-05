@@ -68,14 +68,14 @@ class PrintingTestController extends Controller
     {
         $language = in_array($request->query('lang'), ['si', 'en', 'si+en'], true)
             ? $request->query('lang')
-            : $settings->get('receipt.language', 'si');
+            : $settings->get('receipt.language', 'en');
 
         $items = [
-            ['name' => 'Urea Fertilizer 50kg', 'name_si' => 'යූරියා පොහොර 50kg', 'qty' => 2, 'unit' => 'bag', 'unit_si' => 'බෑග්', 'price' => 9500.00],
-            ['name' => 'Paddy Seed BG 352 1kg', 'name_si' => 'වී බීජ BG 352 1kg', 'qty' => 5, 'unit' => 'packet', 'unit_si' => 'පැකට්', 'price' => 450.00],
-            ['name' => 'Triple Super Phosphate 1kg', 'name_si' => 'ත්‍රිත්ව සුපර් පොස්පේට් 1kg', 'qty' => 3.5, 'unit' => 'kg', 'unit_si' => 'කි.ග්‍රෑ.', 'price' => 180.00],
-            ['name' => 'Insecticide Spray 100ml', 'name_si' => 'කෘමිනාශක ස්ප්‍රේ 100ml', 'qty' => 1, 'unit' => 'bottle', 'unit_si' => 'බෝතල්', 'price' => 1250.00],
-            ['name' => 'Bicycle Tube 26"', 'name_si' => 'බයිසිකල් ටියුබ් 26"', 'qty' => 2, 'unit' => 'piece', 'unit_si' => 'කෑලි', 'price' => 650.00],
+            ['name' => 'Cement 50kg bag', 'name_si' => 'සිමෙන්ති 50kg', 'qty' => 10, 'unit' => 'bag', 'unit_si' => 'බෑග්', 'price' => 2350.00],
+            ['name' => 'PVC Pipe 1/2" 20ft', 'name_si' => 'PVC බට 1/2"', 'qty' => 6, 'unit' => 'length', 'unit_si' => 'දිග', 'price' => 750.00],
+            ['name' => 'Wire 2.5mm (per m)', 'name_si' => 'වයර් 2.5mm', 'qty' => 12.5, 'unit' => 'metre', 'unit_si' => 'මීටර්', 'price' => 210.00],
+            ['name' => 'Emulsion Paint White 4L', 'name_si' => 'තීන්ත 4L', 'qty' => 1, 'unit' => 'tin', 'unit_si' => 'ටින්', 'price' => 8200.00],
+            ['name' => 'Claw Hammer 16oz', 'name_si' => 'මිටිය', 'qty' => 1, 'unit' => 'piece', 'unit_si' => 'කෑලි', 'price' => 1950.00],
         ];
 
         foreach ($items as &$item) {

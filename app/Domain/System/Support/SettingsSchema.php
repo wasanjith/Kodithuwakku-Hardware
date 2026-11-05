@@ -12,13 +12,13 @@ class SettingsSchema
      */
     public static function groups(): array
     {
-        return [
+        $groups = [
             'shop' => [
                 'title' => 'Shop profile',
-                'description' => 'Printed on invoices and reports, in English and Sinhala.',
+                'description' => 'Printed on invoices and reports.',
                 'fields' => [
                     'name_en' => ['label' => 'Shop name (English)', 'type' => 'text', 'rules' => ['required', 'string', 'max:120']],
-                    'name_si' => ['label' => 'Shop name (Sinhala)', 'type' => 'text', 'rules' => ['required', 'string', 'max:120']],
+                    'name_si' => ['label' => 'Shop name (Sinhala)', 'type' => 'text', 'rules' => ['nullable', 'string', 'max:120']],
                     'address_en' => ['label' => 'Address (English)', 'type' => 'textarea', 'rules' => ['nullable', 'string', 'max:255']],
                     'address_si' => ['label' => 'Address (Sinhala)', 'type' => 'textarea', 'rules' => ['nullable', 'string', 'max:255']],
                     'phone' => ['label' => 'Phone', 'type' => 'text', 'rules' => ['nullable', 'string', 'max:60']],
@@ -53,7 +53,7 @@ class SettingsSchema
                 'title' => 'POS rules',
                 'description' => 'Discount limits and cashier timings.',
                 'fields' => [
-                    'max_discount_percent_sales_staff' => ['label' => 'Max discount without approval: Sales Staff (%)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100']],
+                    'max_discount_percent_cashier' => ['label' => 'Max discount without approval: Cashier (%)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100']],
                     'max_discount_percent_manager' => ['label' => 'Max discount without approval: Manager (%)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100']],
                     'closing_time' => ['label' => 'Shop closing time', 'type' => 'time', 'rules' => ['required', 'date_format:H:i'], 'hint' => 'Default expiry time for a cashier handover.'],
                     'settle_warning_minutes' => ['label' => 'Warn when an invoice waits for settlement longer than (minutes)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:120']],
@@ -65,7 +65,7 @@ class SettingsSchema
                 'description' => 'Stock rules, adjustment approval and alerts.',
                 'fields' => [
                     'allow_negative_stock' => ['label' => 'Allow selling more than the stock on hand', 'type' => 'checkbox', 'rules' => ['boolean'], 'hint' => 'Leave off so stock can never go below zero.'],
-                    'adjustment_approval_limit' => ['label' => 'Adjustments need Super Admin approval when one person\'s adjustments in a day add up to more than (Rs.)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100000000']],
+                    'adjustment_approval_limit' => ['label' => 'Adjustments need Owner approval when one person\'s adjustments in a day add up to more than (Rs.)', 'type' => 'number', 'rules' => ['required', 'numeric', 'min:0', 'max:100000000']],
                     'expiry_alert_days' => ['label' => 'Warn about batches expiring within (days)', 'type' => 'number', 'rules' => ['required', 'integer', 'min:1', 'max:365']],
                 ],
             ],
@@ -101,5 +101,14 @@ class SettingsSchema
                 ],
             ],
         ];
+
+        // English-only shop: no Sinhala fields and only the English invoice.
+        if (! config('pos.sinhala_fields')) {
+            unset($groups['shop']['fields']['name_si'], $groups['shop']['fields']['address_si'], $groups['receipt']['fields']['footer_si']);
+            $groups['receipt']['fields']['language']['options'] = ['en' => 'English'];
+            $groups['receipt']['fields']['language']['rules'] = ['required', 'in:en'];
+        }
+
+        return $groups;
     }
 }

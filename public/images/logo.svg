@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 140" width="480" height="140" role="img" aria-label="Kodithuwakku Hardware">
+  <defs>
+    <mask id="kh-logo-jaw" maskUnits="userSpaceOnUse" x="-70" y="-70" width="140" height="140">
+      <rect x="-70" y="-70" width="140" height="140" fill="#fff"/>
+      <rect x="-6.5" y="-50" width="13" height="22" rx="2" fill="#000"/>
+    </mask>
+  </defs>
+  <!-- icon -->
+  <circle cx="70" cy="70" r="64" fill="#3b0764"/>
+  <circle cx="70" cy="70" r="57" fill="#7e22ce" stroke="#fbbf24" stroke-width="6"/>
+  <g transform="translate(70 72)">
+    <g transform="rotate(-45)" fill="#fbbf24" mask="url(#kh-logo-jaw)">
+      <circle cx="0" cy="-28" r="16"/>
+      <rect x="-6" y="-18" width="12" height="58" rx="6"/>
+    </g>
+    <g transform="rotate(45)" fill="#ffffff">
+      <rect x="-5.5" y="-22" width="11" height="62" rx="5"/>
+      <path d="M-24 -38 h36 q10 0 14 6 v10 h-50 q-4 0 -4 -4 v-8 q0 -4 4 -4 z"/>
+    </g>
+  </g>
+  <!-- name -->
+  <text x="150" y="74" font-family="'Segoe UI', 'Inter', Arial, sans-serif" font-size="42" font-weight="800" fill="#ffffff" textLength="318" lengthAdjust="spacingAndGlyphs">KODITHUWAKKU</text>
+  <rect x="150" y="88" width="40" height="4" rx="2" fill="#fbbf24"/>
+  <text x="200" y="104" font-family="'Segoe UI', 'Inter', Arial, sans-serif" font-size="22" font-weight="700" fill="#fbbf24" textLength="218" lengthAdjust="spacing">HARDWARE</text>
+  <rect x="428" y="88" width="40" height="4" rx="2" fill="#fbbf24"/>
+</svg>

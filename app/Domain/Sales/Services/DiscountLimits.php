@@ -15,7 +15,7 @@ class DiscountLimits
     public function __construct(private readonly Settings $settings) {}
 
     /**
-     * Maximum discount in percent, or null for no limit (Super Admin, or a delegate
+     * Maximum discount in percent, or null for no limit (Owner, or a delegate
      * holding pos.discount.override).
      */
     public function maxPercentFor(User $user): ?BigDecimal
@@ -28,7 +28,7 @@ class DiscountLimits
             return BigDecimal::of('0');
         }
 
-        $key = $user->hasRole(Role::Manager->value) ? 'pos.max_discount_percent_manager' : 'pos.max_discount_percent_sales_staff';
+        $key = $user->hasRole(Role::Manager->value) ? 'pos.max_discount_percent_manager' : 'pos.max_discount_percent_cashier';
 
         return BigDecimal::of((string) $this->settings->get($key, 0));
     }

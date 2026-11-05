@@ -20,16 +20,16 @@
 return [
 
     'roles' => [
-        'super_admin' => 'Super Admin',
+        'super_admin' => 'Owner',
         'manager' => 'Manager',
-        'sales_staff' => 'Sales Staff',
+        'cashier' => 'Cashier',
     ],
 
     'permissions' => [
         // POS
-        'pos.sell' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
-        'pos.reprint' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
-        'pos.discount.basic' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
+        'pos.sell' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
+        'pos.reprint' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
+        'pos.discount.basic' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
         'pos.settle' => ['roles' => ['super_admin'], 'delegable' => true],
         'pos.live_view' => ['roles' => ['super_admin'], 'delegable' => true],
         'pos.void' => ['roles' => ['super_admin'], 'delegable' => true],
@@ -43,32 +43,32 @@ return [
         'drawer.handover' => ['roles' => ['super_admin'], 'delegable' => null],
 
         // Catalog
-        'catalog.view' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
+        'catalog.view' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
         'catalog.manage' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'catalog.prices.manage' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'catalog.cost.view' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'catalog.synonyms.manage' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
 
         // Inventory
-        'inventory.view' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
+        'inventory.view' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
         'inventory.adjust' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'inventory.adjust.approve' => ['roles' => ['super_admin'], 'delegable' => null],
         'inventory.stocktake' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
 
         // Purchasing
-        'purchasing.po.create' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
+        'purchasing.po.create' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
         'purchasing.po.approve' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'purchasing.grn.create' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'purchasing.suppliers.manage' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'purchasing.suppliers.pay' => ['roles' => ['super_admin'], 'delegable' => null],
 
         // Customers
-        'customers.view' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
+        'customers.view' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
         'customers.manage' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'customers.credit.manage' => ['roles' => ['super_admin', 'manager'], 'delegable' => true],
 
         // HR
-        'hr.attendance.self' => ['roles' => ['super_admin', 'manager', 'sales_staff'], 'delegable' => null],
+        'hr.attendance.self' => ['roles' => ['super_admin', 'manager', 'cashier'], 'delegable' => null],
         'hr.attendance.view' => ['roles' => ['super_admin', 'manager'], 'delegable' => null],
         'hr.attendance.edit' => ['roles' => ['super_admin'], 'delegable' => false],
         'hr.employees.manage' => ['roles' => ['super_admin'], 'delegable' => false],
@@ -117,6 +117,12 @@ return [
     | Default values for the settings table, grouped as they appear on the
     | settings pages. Keys are stored as "group.key".
     */
+    /*
+    | Sinhala / Tamil name fields on forms and the Sinhala invoice options. The hardware shop
+    | is English only, so they are hidden (the columns stay, empty).
+    */
+    'sinhala_fields' => (bool) env('POS_SINHALA_FIELDS', false),
+
     'settings_defaults' => [
         'shop' => [
             'name_en' => 'Kodithuwakku Hardware',
@@ -126,20 +132,20 @@ return [
             'phone' => '',
         ],
         'receipt' => [
-            'language' => 'si',
+            'language' => 'en',
             'footer_en' => 'Thank you! Goods once sold are not returnable without the invoice.',
             'footer_si' => 'ස්තූතියි! ඉන්වොයිසිය නොමැතිව විකුණූ භාණ්ඩ ආපසු භාර ගනු නොලැබේ.',
             'show_staff_name' => true,
             'show_logo' => false,
         ],
         'tax' => [
-            'registered' => false,
+            'registered' => true,
             'vat_number' => '',
-            'default_rate' => 0,
+            'default_rate' => 18,
         ],
         'pos' => [
-            'max_discount_percent_sales_staff' => 5,
-            'max_discount_percent_manager' => 10,
+            'max_discount_percent_cashier' => 10,
+            'max_discount_percent_manager' => 25,
             'closing_time' => '18:00',
             'settle_warning_minutes' => 5,
             'invoice_sound' => false,

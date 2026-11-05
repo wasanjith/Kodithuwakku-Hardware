@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
  *   lines: list of {product_id, variant_id, unit_id, qty, unit_cost}
  *
  * Costs (unit_cost, discount, tax) are only taken from users with catalog.cost.view.
- * When Sales Staff edit an order, the costs already on it are kept per product/unit.
+ * When Cashiers edit an order, the costs already on it are kept per product/unit.
  */
 class SavePurchaseOrderAction
 {

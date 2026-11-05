@@ -13,7 +13,7 @@ use App\Models\User;
  *
  * The holder of the open drawer session on the main cashier terminal; if no drawer is
  * open, the holder of an active delegation that includes "pos.settle"; otherwise the
- * owner (first active Super Admin).
+ * owner (first active Owner).
  */
 class CashierAuthority
 {

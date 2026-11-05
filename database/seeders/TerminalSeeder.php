@@ -8,7 +8,8 @@ use App\Domain\Identity\Models\Terminal;
 use Illuminate\Database\Seeder;
 
 /**
- * The shop's four terminals, each with its own USB thermal printer.
+ * The shop's five terminals (main machine + 4 counters), each with its own USB thermal printer.
+ * Counters have no cash drawer by default; one with a drawer takes payment itself (phase H3).
  */
 class TerminalSeeder extends Seeder
 {
@@ -19,6 +20,7 @@ class TerminalSeeder extends Seeder
             ['code' => 'C1', 'name' => 'Counter 1', 'type' => TerminalType::Counter, 'counter_no' => 1, 'printer' => 'Printer #1 (Counter 1)', 'drawer' => false],
             ['code' => 'C2', 'name' => 'Counter 2', 'type' => TerminalType::Counter, 'counter_no' => 2, 'printer' => 'Printer #2 (Counter 2)', 'drawer' => false],
             ['code' => 'C3', 'name' => 'Counter 3', 'type' => TerminalType::Counter, 'counter_no' => 3, 'printer' => 'Printer #3 (Counter 3)', 'drawer' => false],
+            ['code' => 'C4', 'name' => 'Counter 4', 'type' => TerminalType::Counter, 'counter_no' => 4, 'printer' => 'Printer #4 (Counter 4)', 'drawer' => false],
         ];
 
         foreach ($terminals as $definition) {

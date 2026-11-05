@@ -93,7 +93,7 @@ class StockAdjustmentController extends Controller
         $adjustment = $create->handle($request->validated(), $request->user());
 
         return redirect()->route('inventory.adjustments.show', $adjustment)->with('success', $adjustment->status === AdjustmentStatus::PendingApproval
-            ? "{$adjustment->number} is waiting for the Super Admin's approval. Stock changes when it is approved."
+            ? "{$adjustment->number} is waiting for the Owner's approval. Stock changes when it is approved."
             : "{$adjustment->number} posted. Stock is updated.");
     }
 

@@ -78,7 +78,7 @@ class PurchaseOrderPolicy
     }
 
     /**
-     * Unit costs and totals. Sales Staff never see them.
+     * Unit costs and totals. Cashiers never see them.
      */
     public function viewCost(User $user): bool
     {

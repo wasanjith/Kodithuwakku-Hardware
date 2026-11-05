@@ -5,7 +5,7 @@ namespace App\Domain\Finance\Policies;
 use App\Models\User;
 
 /**
- * The cheque register: Super Admin only.
+ * The cheque register: Owner only.
  */
 class ChequePolicy
 {

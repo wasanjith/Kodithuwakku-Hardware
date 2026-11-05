@@ -28,7 +28,7 @@ beforeEach(function () {
     $this->retail = PriceList::firstWhere('name', 'Retail');
     $this->wholesale = PriceList::firstWhere('name', 'Wholesale');
     $this->loose = createProduct(
-        ['name' => 'Urea (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'sold_loose' => true],
+        ['name' => 'Urea (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'sold_loose' => true],
         prices: ['Retail' => ['kg' => '300.00', 'kg@1' => '250.00'], 'Wholesale' => ['kg@1' => '240.00']],
     );
 });
@@ -70,7 +70,7 @@ test('a wholesale customer gets the wholesale price where there is one, else the
 });
 
 test('a sealed product ignores quantity tiers', function () {
-    $packet = createProduct(['name' => 'Okra 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
+    $packet = createProduct(['name' => 'Okra 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
     ProductPrice::create([
         'product_id' => $packet->id,
         'unit_id' => unitId('packet'),
@@ -84,7 +84,7 @@ test('a sealed product ignores quantity tiers', function () {
 });
 
 test('a product without any price cannot be billed', function () {
-    $packet = createProduct(['name' => 'Okra 250g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
+    $packet = createProduct(['name' => 'Okra 250g packet', 'category' => 'Fasteners', 'base_unit' => 'packet']);
 
     expect(fn () => priceOneLine($packet, 'packet', '1'))
         ->toThrow(ValidationException::class, 'Okra 250g packet has no price per packet.');
@@ -92,7 +92,7 @@ test('a product without any price cannot be billed', function () {
 
 test('clearing a price removes it, and the wholesale customer falls back to the retail price', function () {
     $packet = createProduct(
-        ['name' => 'Okra 50g packet', 'category' => 'Seeds', 'base_unit' => 'packet'],
+        ['name' => 'Okra 50g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'],
         prices: ['Retail' => ['packet' => '290.00'], 'Wholesale' => ['packet' => '270.00']],
     );
 
@@ -115,7 +115,7 @@ test('clearing a price removes it, and the wholesale customer falls back to the 
 });
 
 test('an empty price that was never set adds no history row', function () {
-    $packet = createProduct(['name' => 'Okra 100g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '530.00']]);
+    $packet = createProduct(['name' => 'Okra 100g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '530.00']]);
     $before = ProductPrice::count();
 
     app(SaveProductAction::class)->handle([
@@ -129,7 +129,7 @@ test('quantity prices are only allowed on products sold loose', function () {
     $this->actingAs($this->owner)->post(route('catalog.products.store'), [
         'short_code' => '1500',
         'name' => 'TSP 50kg bag',
-        'category_id' => Category::firstWhere('name', 'Fertilizers')->id,
+        'category_id' => Category::firstWhere('name', 'Building Materials')->id,
         'base_unit_id' => unitId('bag'),
         'reorder_level' => '0',
         'reorder_qty' => '0',
@@ -139,7 +139,7 @@ test('quantity prices are only allowed on products sold loose', function () {
 });
 
 test('the minimum margin also guards quantity prices', function () {
-    $product = createProduct(['name' => 'MOP (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'sold_loose' => true, 'reference_cost' => '200', 'min_selling_margin_pct' => '10']);
+    $product = createProduct(['name' => 'MOP (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'sold_loose' => true, 'reference_cost' => '200', 'min_selling_margin_pct' => '10']);
 
     // Cost 200/kg + 10% = 220/kg.
     expect(fn () => app(SaveProductAction::class)->handle([
@@ -148,11 +148,11 @@ test('the minimum margin also guards quantity prices', function () {
 });
 
 test('a sealed pack can only be opened into a product sold loose', function () {
-    $sealedTarget = createProduct(['name' => 'Urea 25kg bag', 'category' => 'Fertilizers', 'base_unit' => 'bag']);
+    $sealedTarget = createProduct(['name' => 'Urea 25kg bag', 'category' => 'Building Materials', 'base_unit' => 'bag']);
     $payload = fn (array $overrides) => [
         'short_code' => '1600',
         'name' => 'Urea 50kg bag',
-        'category_id' => Category::firstWhere('name', 'Fertilizers')->id,
+        'category_id' => Category::firstWhere('name', 'Building Materials')->id,
         'base_unit_id' => unitId('bag'),
         'reorder_level' => '0',
         'reorder_qty' => '0',
@@ -186,7 +186,7 @@ test('a sealed pack can only be opened into a product sold loose', function () {
 
 test('the invoice line records the price list its price came from', function () {
     $pos = posSetup();
-    $packet = createProduct(['name' => 'Okra 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
+    $packet = createProduct(['name' => 'Okra 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
     app(StockService::class)->receive($this->loose, null, '100', '200');
     app(StockService::class)->receive($packet, null, '20', '72');
 
@@ -211,7 +211,7 @@ test('the product form saves both loose prices and shows them again on edit', fu
     $payload = [
         'short_code' => '1700',
         'name' => 'TSP (loose)',
-        'category_id' => Category::firstWhere('name', 'Fertilizers')->id,
+        'category_id' => Category::firstWhere('name', 'Building Materials')->id,
         'base_unit_id' => unitId('kg'),
         'sold_loose' => '1',
         'reorder_level' => '0',
@@ -256,7 +256,7 @@ test('an empty quantity price on a product that is not loose is not an error', f
     $this->actingAs($this->owner)->post(route('catalog.products.store'), [
         'short_code' => '2100',
         'name' => 'Okra 10g packet',
-        'category_id' => Category::firstWhere('name', 'Seeds')->id,
+        'category_id' => Category::firstWhere('name', 'Fasteners')->id,
         'base_unit_id' => unitId('packet'),
         'reorder_level' => '0',
         'reorder_qty' => '0',
@@ -287,7 +287,7 @@ test('the counter gets every rate of a unit, with the retail fallback filled in'
 });
 
 test('a sealed product has a single rate at the counter', function () {
-    $packet = createProduct(['name' => 'Okra 50g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '290.00']]);
+    $packet = createProduct(['name' => 'Okra 50g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '290.00']]);
 
     expect(priceOneLine($packet, 'packet', '3')['units'][0]['tiers'])->toBe([['min_qty' => '0.000', 'price' => '290.00']]);
 });
@@ -314,10 +314,10 @@ test('the invoice shows grams next to an amount under 1 kg', function () {
 });
 
 test('products without a selling price are listed in the report and on the product list', function () {
-    $priced = createProduct(['name' => 'Okra 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
-    $never = createProduct(['name' => 'Okra 250g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
-    $wholesaleOnly = createProduct(['name' => 'Bush Bean 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Wholesale' => ['packet' => '110.00']]);
-    $removed = createProduct(['name' => 'Mas Long Bean 100g packet', 'category' => 'Seeds', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '400.00']]);
+    $priced = createProduct(['name' => 'Okra 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '120.00']]);
+    $never = createProduct(['name' => 'Okra 250g packet', 'category' => 'Fasteners', 'base_unit' => 'packet']);
+    $wholesaleOnly = createProduct(['name' => 'Bush Bean 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Wholesale' => ['packet' => '110.00']]);
+    $removed = createProduct(['name' => 'Mas Long Bean 100g packet', 'category' => 'Fasteners', 'base_unit' => 'packet'], prices: ['Retail' => ['packet' => '400.00']]);
     app(SaveProductAction::class)->handle([
         'prices' => [['unit_id' => unitId('packet'), 'price_list_id' => $this->retail->id, 'min_qty' => '0', 'price' => '']],
     ], $this->owner, $removed);
@@ -339,16 +339,23 @@ test('products without a selling price are listed in the report and on the produ
         ->assertDontSee($priced->name);
 });
 
-test('the demo catalog holds the owner seed list, one product per packet size', function () {
+test('the demo catalog holds hardware products, with rolls that open into wire sold by the metre', function () {
     $this->seed(DevelopmentCatalogSeeder::class);
 
-    $packet = Product::firstWhere('short_code', '2012');
+    $roll = Product::firstWhere('short_code', '30001');
+    $perMetre = Product::firstWhere('short_code', '30002');
+    $contractor = PriceList::firstWhere('name', 'Contractor');
 
-    expect(Product::where('category_id', $packet->category_id)->count())->toBe(51)
-        ->and($packet->name)->toBe('Okra Haritha 50g packet')
-        ->and($packet->name_si)->toBe('බණ්ඩක්කා(හරිත) 50g')
-        ->and(priceOneLine($packet, 'packet', '1')['unit_price'])->toBe('290.00')
-        ->and(priceOneLine(Product::firstWhere('name', 'Chili MI-2 250g packet'), 'packet', '1')['unit_price'])->toBe('3000.00')
+    expect(Product::whereKeyNot($this->loose->id)->count())->toBe(51)
+        ->and($roll->name)->toBe('Wire 2.5mm 90m roll')
+        ->and($roll->opens_into_product_id)->toBe($perMetre->id)
+        ->and($roll->opens_into_qty)->toBe('90.000')
+        ->and($perMetre->sold_loose)->toBeTrue()
+        ->and($roll->sold_loose)->toBeFalse()
+        ->and($perMetre->category->path())->toBe('Electrical › Wires & Cables')
+        ->and(priceOneLine(Product::firstWhere('short_code', '10001'), 'bag', '1')['unit_price'])->toBe('2350.00')
+        ->and(priceOneLine(Product::firstWhere('short_code', '10001'), 'bag', '1', $contractor)['unit_price'])->toBe('2280.00')
+        ->and(priceOneLine($perMetre, 'metre', '12.5')['gross'])->toBe('2625.00')
         ->and(app(PriceBook::class)->whereWithoutPrice(Product::query(), $this->retail->id)->pluck('short_code')->all())
-        ->toBe(['2014', '2024', '2033', '2034', '2043', '2044', '2053', '2064', '2113', '2123', '2171']);
+        ->toBe(['40010']);
 });

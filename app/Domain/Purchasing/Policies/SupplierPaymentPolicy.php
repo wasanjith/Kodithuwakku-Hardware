@@ -5,7 +5,7 @@ namespace App\Domain\Purchasing\Policies;
 use App\Models\User;
 
 /**
- * Supplier payments: listed for whoever manages suppliers, made by the Super Admin.
+ * Supplier payments: listed for whoever manages suppliers, made by the Owner.
  */
 class SupplierPaymentPolicy
 {

@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
  * find a PIN by trying every number at a terminal over a day or two.
  *
  * Every wrong PIN is written to the audit log. When an account reaches the limit its PIN
- * stops working until midnight (or until the owner sets a new PIN) and the Super Admins
+ * stops working until midnight (or until the owner sets a new PIN) and the Owners
  * get a notification.
  */
 class PinLockout

@@ -6,7 +6,7 @@ use App\Models\User;
 
 /**
  * Everyone clocks in and out and sees their own attendance; the Manager sees everyone's;
- * only the Super Admin corrects it.
+ * only the Owner corrects it.
  */
 class AttendancePolicy
 {

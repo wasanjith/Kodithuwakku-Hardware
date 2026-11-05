@@ -37,7 +37,7 @@
         </div>
 
         @if ($users->isEmpty())
-            <x-ui.empty-state class="mt-6" title="No users have a PIN yet" description="A Super Admin can set PINs on the Users page." />
+            <x-ui.empty-state class="mt-6" title="No users have a PIN yet" description="An Owner can set PINs on the Users page." />
         @else
             <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 @foreach ($users as $pinUser)

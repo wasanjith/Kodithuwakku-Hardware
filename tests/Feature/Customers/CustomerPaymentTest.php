@@ -10,6 +10,7 @@ use App\Domain\Sales\Enums\PrintDocumentType;
 use App\Domain\Sales\Models\PrintJob;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Support\Money;
+use App\Domain\System\Services\Settings;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
@@ -127,6 +128,8 @@ test('payments are only taken by the drawer holder on the main terminal', functi
 });
 
 test('the payment receipt prints in Sinhala with the invoices paid and the new balance', function () {
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+
     receive($this->pos, $this->customer, ['amount' => '10000'])->assertRedirect();
     $payment = CustomerPayment::sole();
     $job = PrintJob::where('document_type', PrintDocumentType::PaymentReceipt)->sole();
@@ -167,6 +170,8 @@ test('sale pages show what is still owed and the payments applied', function () 
 });
 
 test('the drawer report shows customer payments', function () {
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+
     receive($this->pos, $this->customer, ['amount' => '2500'])->assertRedirect();
 
     atTerminal($this->pos['mainToken'], $this->pos['owner'])

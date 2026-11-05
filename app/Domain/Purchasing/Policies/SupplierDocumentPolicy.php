@@ -21,7 +21,7 @@ class SupplierDocumentPolicy
     }
 
     /**
-     * The Super Admin may remove any document; others only what they added themselves today
+     * The Owner may remove any document; others only what they added themselves today
      * (a wrong or blurred photo noticed straight away).
      */
     public function delete(User $user, SupplierDocument $document): bool

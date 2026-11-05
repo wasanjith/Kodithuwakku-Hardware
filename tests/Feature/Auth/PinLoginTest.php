@@ -7,13 +7,13 @@ use Spatie\Activitylog\Models\Activity;
 
 function staffWithPin(string $pin = '4321', array $attributes = []): User
 {
-    return User::factory()->withPin($pin)->salesStaff()->create($attributes);
+    return User::factory()->withPin($pin)->cashier()->create($attributes);
 }
 
 test('the PIN page lists users who have a PIN on a registered terminal', function () {
     [, $token] = registeredTerminal();
     $withPin = staffWithPin(attributes: ['name' => 'Kamal Perera']);
-    userWithRole(Role::SalesStaff, ['name' => 'No Pin Person']);
+    userWithRole(Role::Cashier, ['name' => 'No Pin Person']);
 
     $this->withCookie(deviceCookie(), $token)
         ->get(route('pin-login'))
@@ -144,7 +144,7 @@ test('too many wrong PINs in a day lock the PIN, are logged and tell the owner; 
         ->and($owner->notifications()->count())->toBe(1);
     $this->assertGuest();
 
-    app(SaveUserAction::class)->handle(['name' => $user->name, 'username' => $user->username, 'role' => Role::SalesStaff->value, 'pin' => '5678'], $user);
+    app(SaveUserAction::class)->handle(['name' => $user->name, 'username' => $user->username, 'role' => Role::Cashier->value, 'pin' => '5678'], $user);
 
     $this->withCookie(deviceCookie(), $token)
         ->post(route('pin-login.store'), ['user_id' => $user->id, 'pin' => '5678'])

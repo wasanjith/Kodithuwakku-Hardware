@@ -60,7 +60,7 @@ test('editing a customer does not touch the account', function () {
         ->and(CustomerLedgerEntry::count())->toBe(1);
 });
 
-test('Sales Staff can look up customers but not change them', function () {
+test('Cashiers can look up customers but not change them', function () {
     $customer = creditCustomer();
 
     $this->actingAs($this->pos['staff'])->get(route('customers.index'))->assertOk()->assertSee($customer->name);
@@ -174,9 +174,9 @@ test('every morning the Owner and Manager hear about overdue credit, unless swit
     Notification::assertNothingSent();
 });
 
-test('taking customer payments is part of a cashier handover, never a Sales Staff permission', function () {
+test('taking customer payments is part of a cashier handover, never a Cashier permission', function () {
     expect(config('pos.permissions')['customers.credit.manage']['delegable'])->toBeTrue()
-        ->and(userWithRole(Role::SalesStaff)->can('customers.credit.manage'))->toBeFalse();
+        ->and(userWithRole(Role::Cashier)->can('customers.credit.manage'))->toBeFalse();
 });
 
 test('the dummy customer seeder can run twice and gives opening balances', function () {

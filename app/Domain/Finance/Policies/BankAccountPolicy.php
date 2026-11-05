@@ -5,7 +5,7 @@ namespace App\Domain\Finance\Policies;
 use App\Models\User;
 
 /**
- * Bank accounts, the bank book, moving money and reconciliation: Super Admin only.
+ * Bank accounts, the bank book, moving money and reconciliation: Owner only.
  */
 class BankAccountPolicy
 {

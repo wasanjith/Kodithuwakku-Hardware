@@ -16,7 +16,9 @@
         <x-ui.card>
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.input name="name" label="Name (English)" :value="$category->name" required />
-                <x-ui.input name="name_si" label="Sinhala name" :value="$category->name_si" class="font-sinhala" />
+                @if (config('pos.sinhala_fields'))
+                    <x-ui.input name="name_si" label="Sinhala name" :value="$category->name_si" class="font-sinhala" />
+                @endif
                 <x-ui.select name="parent_id" label="Parent category" :options="$parents" :value="$category->parent_id" placeholder="None (top level)" class="sm:col-span-2" />
                 <x-ui.input name="code_from" label="Short codes from" type="number" min="1" :value="$category->code_from" hint="Optional. Sub-categories use the parent's range when empty." />
                 <x-ui.input name="code_to" label="Short codes to" type="number" min="1" :value="$category->code_to" />

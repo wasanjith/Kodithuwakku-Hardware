@@ -13,6 +13,7 @@ use App\Domain\Sales\Models\CounterEvent;
 use App\Domain\Sales\Models\Payment;
 use App\Domain\Sales\Models\PrintJob;
 use App\Domain\Sales\Models\Sale;
+use App\Domain\System\Services\Settings;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -134,6 +135,8 @@ test('voiding a settled credit sale the same day takes it off the account', func
 });
 
 test('the printed credit invoice shows the customer and the CREDIT mark', function () {
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+
     $customer = creditCustomer('50000', ['name' => 'Sunil Perera', 'name_si' => 'සුනිල් පෙරේරා']);
     $sale = counterInvoice($this->pos, ureaBags($this, '1'), ['customer_id' => $customer->id, 'payment_method' => 'credit']);
 
@@ -189,6 +192,8 @@ test('the customer balance always equals debits minus credits, and unpaid invoic
 });
 
 test('settling a credit sale prints a credit bill on the main printer for the customer signature and shop seal', function () {
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+
     $customer = creditCustomer('50000', ['name' => 'Sunil Perera', 'name_si' => 'සුනිල් පෙරේරා', 'nic' => '881234567V']);
     $sale = counterInvoice($this->pos, ureaBags($this, '1'), ['customer_id' => $customer->id, 'payment_method' => 'credit']);
     openDrawer($this->pos['main'], $this->pos['owner']);

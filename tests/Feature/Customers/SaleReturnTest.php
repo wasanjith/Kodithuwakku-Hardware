@@ -15,6 +15,7 @@ use App\Domain\Sales\Models\PrintJob;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Models\SaleReturn;
 use App\Domain\Sales\Support\Money;
+use App\Domain\System\Services\Settings;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -194,6 +195,8 @@ test('returns need pos.refund at the main cashier', function () {
 });
 
 test('return pages and the Sinhala return receipt render', function () {
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+
     $sale = settledSeedSale($this, '2');
 
     atTerminal($this->pos['mainToken'], $this->pos['owner'])

@@ -10,53 +10,77 @@ use Illuminate\Database\Seeder;
 
 /**
  * Catalogue master data the shop needs before the first product: units,
- * price lists, a VAT rate (inactive until the owner confirms VAT registration)
- * and the top-level categories with their short code ranges.
+ * price lists, VAT 18 % (the shop is VAT-registered) and the top-level hardware
+ * categories with their short code ranges. Codes are 5 digits because the shop
+ * has 10,000+ products; a category without a range gets codes from 100000.
  */
 class CatalogSeeder extends Seeder
 {
     public function run(): void
     {
         $units = [
-            // name, Sinhala, symbol, allows decimal
-            ['kg', 'කිලෝ', 'kg', true],
-            ['g', 'ග්‍රෑම්', 'g', false],
-            ['bag', 'මල්ල', 'bag', false],
-            ['packet', 'පැකට්', 'pkt', false],
-            ['bottle', 'බෝතල්', 'btl', false],
-            ['piece', 'කෑලි', 'pc', false],
-            ['pair', 'යුගල', 'pair', false],
-            ['set', 'කට්ටල', 'set', false],
-            ['litre', 'ලීටර්', 'L', true],
-            ['ml', 'මිලි ලීටර්', 'ml', false],
-            ['roll', 'රෝල්', 'roll', false],
-            ['metre', 'මීටර්', 'm', true],
+            // name, symbol, allows decimal
+            ['piece', 'pc', false],
+            ['pair', 'pair', false],
+            ['set', 'set', false],
+            ['box', 'box', false],
+            ['packet', 'pkt', false],
+            ['dozen', 'doz', false],
+            ['bag', 'bag', false],
+            ['bottle', 'btl', false],
+            ['tube', 'tube', false],
+            ['tin', 'tin', false],
+            ['roll', 'roll', false],
+            ['coil', 'coil', false],
+            ['sheet', 'sheet', false],
+            ['length', 'len', false],
+            ['bundle', 'bdl', false],
+            ['kg', 'kg', true],
+            ['g', 'g', false],
+            ['metre', 'm', true],
+            ['feet', 'ft', true],
+            ['inch', 'in', true],
+            ['sq ft', 'sq ft', true],
+            ['cube', 'cu', true],
+            ['litre', 'L', true],
+            ['ml', 'ml', false],
+            ['gallon', 'gal', true],
         ];
 
-        foreach ($units as [$name, $nameSi, $symbol, $allowsDecimal]) {
-            Unit::updateOrCreate(['name' => $name], ['name_si' => $nameSi, 'symbol' => $symbol, 'allows_decimal' => $allowsDecimal]);
+        foreach ($units as [$name, $symbol, $allowsDecimal]) {
+            Unit::updateOrCreate(['name' => $name], ['symbol' => $symbol, 'allows_decimal' => $allowsDecimal]);
         }
 
-        foreach (['Retail' => true, 'Wholesale' => false, 'Farmer Credit' => false] as $name => $isDefault) {
+        foreach (['Retail' => true, 'Wholesale' => false, 'Contractor' => false] as $name => $isDefault) {
             PriceList::updateOrCreate(['name' => $name], ['is_default' => $isDefault]);
         }
 
-        Tax::firstOrCreate(['name' => 'VAT'], ['rate' => 18, 'is_active' => false]);
+        Tax::firstOrCreate(['name' => 'VAT'], ['rate' => 18, 'is_active' => true]);
 
         $categories = [
-            // name, Sinhala, code range, children
-            ['Fertilizers', 'පොහොර', [1000, 1999], []],
-            ['Seeds', 'බීජ', [2000, 2999], []],
-            ['Agro-chemicals', 'කෘෂි රසායන', [3000, 3999], ['Insecticides', 'Fungicides', 'Herbicides']],
-            ['Tools', 'උපකරණ', [4000, 4999], []],
-            ['Bicycle Parts', 'බයිසිකල් කොටස්', [5000, 6999], ['Tyres', 'Tubes', 'Chains', 'Brakes', 'Gears']],
-            ['Other', 'වෙනත්', [9000, 9999], []],
+            // name, code range, children
+            ['Building Materials', [10000, 14999], ['Cement', 'Sand & Metal', 'Bricks & Blocks', 'Steel & Iron']],
+            ['Roofing', [15000, 17999], ['Roofing Sheets', 'Gutters & Accessories']],
+            ['Timber & Boards', [18000, 19999], []],
+            ['Plumbing', [20000, 24999], ['PVC Pipes', 'Pipe Fittings', 'Taps & Valves', 'Water Tanks']],
+            ['Sanitaryware & Tiles', [25000, 29999], ['Sanitaryware', 'Tiles', 'Tile Adhesive & Grout']],
+            ['Electrical', [30000, 34999], ['Wires & Cables', 'Switches & Sockets', 'Lighting', 'Breakers & DB Boxes', 'Conduits']],
+            ['Paints', [35000, 39999], ['Emulsion', 'Enamel', 'Primers & Undercoats', 'Wood Finishes', 'Brushes & Rollers', 'Thinners & Solvents']],
+            ['Hand Tools', [40000, 44999], []],
+            ['Power Tools', [45000, 47999], ['Drills', 'Grinders', 'Bits & Accessories']],
+            ['Pumps & Motors', [48000, 49999], []],
+            ['Fasteners', [50000, 54999], ['Nails', 'Screws', 'Bolts & Nuts', 'Wall Plugs & Anchors']],
+            ['Door & Window Hardware', [55000, 59999], ['Locks', 'Hinges', 'Handles', 'Tower Bolts']],
+            ['Adhesives & Chemicals', [60000, 64999], ['Glue', 'Sealants & Silicone', 'Waterproofing']],
+            ['Garden & Agriculture', [65000, 69999], ['Hoses', 'Sprayers', 'Garden Tools']],
+            ['Safety & Workwear', [70000, 72999], []],
+            ['Other', [90000, 99999], []],
         ];
 
-        foreach ($categories as $order => [$name, $nameSi, [$from, $to], $children]) {
+        foreach ($categories as $order => [$name, [$from, $to], $children]) {
             $parent = Category::updateOrCreate(
                 ['name' => $name, 'parent_id' => null],
-                ['name_si' => $nameSi, 'code_from' => $from, 'code_to' => $to, 'sort_order' => $order],
+                ['code_from' => $from, 'code_to' => $to, 'sort_order' => $order],
             );
 
             foreach ($children as $childOrder => $child) {

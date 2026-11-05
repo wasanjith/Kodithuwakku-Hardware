@@ -14,18 +14,18 @@
     --font-sans: 'Inter Variable', 'Noto Sans Sinhala', ui-sans-serif, system-ui, sans-serif;
     --font-sinhala: 'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif;
 
-    /* Brand: agro green */
-    --color-brand-50: #eefbf3;
-    --color-brand-100: #d6f5e1;
-    --color-brand-200: #b0e9c7;
-    --color-brand-300: #7cd6a6;
-    --color-brand-400: #46bc80;
-    --color-brand-500: #23a164;
-    --color-brand-600: #16824f;
-    --color-brand-700: #136842;
-    --color-brand-800: #125336;
-    --color-brand-900: #10442e;
-    --color-brand-950: #07261a;
+    /* Brand: Kodithuwakku Hardware purple (accent: amber-400 #fbbf24, as in the logo) */
+    --color-brand-50: #faf5ff;
+    --color-brand-100: #f3e8ff;
+    --color-brand-200: #e9d5ff;
+    --color-brand-300: #d8b4fe;
+    --color-brand-400: #c084fc;
+    --color-brand-500: #a855f7;
+    --color-brand-600: #9333ea;
+    --color-brand-700: #7e22ce;
+    --color-brand-800: #6b21a8;
+    --color-brand-900: #581c87;
+    --color-brand-950: #3b0764;
 }
 
 @layer base {
@@ -43,7 +43,7 @@
 }
 
 @layer components {
-    /* Sidebar scrollbar: green thumb on the sidebar's own green track. */
+    /* Sidebar scrollbar: purple thumb on the sidebar's own purple track. */
     .sidebar-scroll {
         scrollbar-width: thin;
         scrollbar-color: var(--color-brand-700) var(--color-brand-900);

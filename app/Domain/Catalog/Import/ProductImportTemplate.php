@@ -8,9 +8,8 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
 /**
- * Downloadable .xlsx template with the headings and example rows: seed packets (one
- * product per pack size), loose urea with its two prices, the sealed urea bag that is
- * opened into it, and a bicycle part.
+ * Downloadable .xlsx template with the headings and example rows: PVC pipes (one product
+ * per size), wire sold by the metre, the sealed 90 m roll that is opened into it, and a tool.
  */
 class ProductImportTemplate implements FromArray, ShouldAutoSize, WithHeadings
 {
@@ -30,12 +29,12 @@ class ProductImportTemplate implements FromArray, ShouldAutoSize, WithHeadings
     public function array(): array
     {
         $rows = [
-            ['name' => 'Okra', 'name_si' => 'බණ්ඩක්කා', 'category' => 'Seeds', 'brand' => 'Bathalagoda Agro', 'base_unit' => 'packet', 'pack_size' => '10g packet', 'cost' => 72, 'retail_price' => 120, 'reorder_level' => 50],
-            ['pack_size' => '50g packet', 'cost' => 192, 'retail_price' => 290, 'reorder_level' => 15],
-            ['pack_size' => '100g packet', 'cost' => 348, 'retail_price' => 530, 'reorder_level' => 15],
-            ['name' => 'Urea (loose)', 'name_si' => 'යූරියා (ලිහිල්)', 'aliases' => 'yuriya', 'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer', 'base_unit' => 'kg', 'cost' => 200, 'loose_price_kg' => 250, 'loose_price_small' => 300, 'reorder_level' => 25],
-            ['name' => 'Urea', 'name_si' => 'යූරියා', 'aliases' => 'urea bag, u50', 'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'cost' => 10000, 'wholesale_price' => 11800, 'retail_price' => 12000, 'reorder_level' => 5, 'opens_into' => 'Urea (loose)', 'opens_into_qty' => 50],
-            ['name' => 'Bicycle Tyre 26"', 'name_si' => 'බයිසිකල් ටයරය 26"', 'aliases' => 'tyre 26', 'category' => 'Bicycle Parts > Tyres', 'brand' => 'DSI', 'base_unit' => 'piece', 'opening_stock' => 40, 'cost' => 1800, 'wholesale_price' => 2150, 'retail_price' => 2250, 'reorder_level' => 5],
+            ['name' => 'PVC Pipe Type 1000', 'aliases' => 'pipe, pvc', 'category' => 'Plumbing > PVC Pipes', 'brand' => 'S-lon', 'base_unit' => 'length', 'pack_size' => '1/2" 20ft', 'cost' => 610, 'wholesale_price' => 720, 'retail_price' => 750, 'reorder_level' => 30],
+            ['pack_size' => '3/4" 20ft', 'cost' => 820, 'wholesale_price' => 960, 'retail_price' => 1000, 'reorder_level' => 30],
+            ['pack_size' => '1" 20ft', 'cost' => 1150, 'wholesale_price' => 1330, 'retail_price' => 1400, 'reorder_level' => 20],
+            ['name' => 'Wire 2.5mm (per m)', 'aliases' => 'wire, cable', 'category' => 'Electrical > Wires & Cables', 'brand' => 'Kelani', 'base_unit' => 'metre', 'cost' => 165, 'loose_price_kg' => 210, 'reorder_level' => 0],
+            ['name' => 'Wire 2.5mm', 'aliases' => 'wire roll', 'category' => 'Electrical > Wires & Cables', 'brand' => 'Kelani', 'base_unit' => 'roll', 'pack_size' => '90m roll', 'cost' => 14800, 'wholesale_price' => 17000, 'retail_price' => 17500, 'reorder_level' => 5, 'opens_into' => 'Wire 2.5mm (per m)', 'opens_into_qty' => 90],
+            ['name' => 'Claw Hammer 16oz', 'aliases' => 'hammer', 'category' => 'Hand Tools', 'brand' => 'Stanley', 'base_unit' => 'piece', 'opening_stock' => 12, 'cost' => 1450, 'wholesale_price' => 1900, 'retail_price' => 1950, 'reorder_level' => 5],
         ];
 
         return array_map(fn (array $row) => array_map(fn (string $key) => $row[$key] ?? '', ProductImportColumns::keys()), $rows);

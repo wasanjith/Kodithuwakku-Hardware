@@ -5,7 +5,7 @@
 
 @section('content')
     <div class="center">
-        <div class="shop-name">{{ __('receipt.test_print', [], 'si') }}</div>
+        <div class="shop-name">{{ __('receipt.test_print', [], 'en') }}</div>
         <div>{{ __('receipt.test_print', [], 'en') }}</div>
     </div>
 
@@ -15,7 +15,7 @@
     <div class="row"><span>Printer</span><span>{{ $printer?->name ?? '—' }}</span></div>
     <div class="row"><span>Windows</span><span>{{ $printer?->windows_name ?: 'default printer' }}</span></div>
     <div class="row"><span>Paper</span><span class="num">{{ $paperWidth }} mm · {{ $printer?->dpi ?? 203 }} dpi</span></div>
-    <div class="row"><span>{{ __('receipt.date', [], 'si') }}</span><span class="num">{{ now()->format('Y-m-d H:i:s') }}</span></div>
+    <div class="row"><span>{{ __('receipt.date', [], 'en') }}</span><span class="num">{{ now()->format('Y-m-d H:i:s') }}</span></div>
 
     <hr class="rule">
 
@@ -36,5 +36,5 @@
     <div class="center muted" style="margin-top: 1mm">72 mm printable width</div>
 
     <hr class="rule">
-    <div class="center muted">{{ __('receipt.thank_you', [], 'si') }} · {{ __('receipt.thank_you', [], 'en') }}</div>
+    <div class="center muted">{{ __('receipt.thank_you', [], 'en') }}</div>
 @endsection

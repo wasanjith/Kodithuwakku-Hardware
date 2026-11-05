@@ -51,7 +51,7 @@ class GoodsReceiptPolicy
     }
 
     /**
-     * Once the GRN is posted, only the Super Admin may remove an invoice photo.
+     * Once the GRN is posted, only the Owner may remove an invoice photo.
      */
     public function removeInvoice(User $user, GoodsReceipt $receipt): bool
     {

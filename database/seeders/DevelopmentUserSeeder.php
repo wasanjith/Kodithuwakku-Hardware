@@ -18,9 +18,10 @@ class DevelopmentUserSeeder extends Seeder
         $users = [
             ['username' => 'owner', 'name' => 'Shop Owner', 'role' => Role::SuperAdmin, 'pin' => '1111'],
             ['username' => 'manager', 'name' => 'Shop Manager', 'role' => Role::Manager, 'pin' => '2222'],
-            ['username' => 'staff1', 'name' => 'Counter Staff 1', 'role' => Role::SalesStaff, 'pin' => '3331'],
-            ['username' => 'staff2', 'name' => 'Counter Staff 2', 'role' => Role::SalesStaff, 'pin' => '3332'],
-            ['username' => 'staff3', 'name' => 'Counter Staff 3', 'role' => Role::SalesStaff, 'pin' => '3333'],
+            ['username' => 'staff1', 'name' => 'Counter 1 Cashier', 'role' => Role::Cashier, 'pin' => '3331'],
+            ['username' => 'staff2', 'name' => 'Counter 2 Cashier', 'role' => Role::Cashier, 'pin' => '3332'],
+            ['username' => 'staff3', 'name' => 'Counter 3 Cashier', 'role' => Role::Cashier, 'pin' => '3333'],
+            ['username' => 'staff4', 'name' => 'Counter 4 Cashier', 'role' => Role::Cashier, 'pin' => '3334'],
         ];
 
         foreach ($users as $definition) {

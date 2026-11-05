@@ -5,7 +5,7 @@ namespace App\Domain\Finance\Policies;
 use App\Models\User;
 
 /**
- * Chart of accounts, journal and financial reports: Super Admin only (never delegated).
+ * Chart of accounts, journal and financial reports: Owner only (never delegated).
  */
 class AccountPolicy
 {

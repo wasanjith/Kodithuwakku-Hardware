@@ -17,7 +17,9 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.input name="name" label="Name" :value="$unit->name" hint="Lower case, e.g. bag" required />
                 <x-ui.input name="symbol" label="Symbol" :value="$unit->symbol" hint="Shown on invoices, e.g. kg" required />
-                <x-ui.input name="name_si" label="Sinhala name" :value="$unit->name_si" class="font-sinhala sm:col-span-2" />
+                @if (config('pos.sinhala_fields'))
+                    <x-ui.input name="name_si" label="Sinhala name" :value="$unit->name_si" class="font-sinhala sm:col-span-2" />
+                @endif
                 <x-ui.checkbox name="allows_decimal" label="Allow decimal quantities" hint="Tick for kg, litre, metre. Leave empty for bag, piece, packet." :checked="$unit->allows_decimal" class="sm:col-span-2" />
             </div>
 

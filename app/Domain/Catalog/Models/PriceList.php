@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Retail, Wholesale, Farmer Credit.
+ * Retail, Wholesale, Contractor.
  *
  * @property int $id
  * @property string $name

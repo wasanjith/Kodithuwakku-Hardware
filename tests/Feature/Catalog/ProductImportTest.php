@@ -43,7 +43,7 @@ function ureaRow(array $overrides = []): array
 {
     return [
         'short_code' => '1001', 'name' => 'Urea 50kg', 'name_si' => 'යූරියා', 'aliases' => 'yuriya, u50',
-        'category' => 'Fertilizers', 'brand' => 'Lanka Fertilizer', 'base_unit' => 'kg',
+        'category' => 'Building Materials', 'brand' => 'Lanka Fertilizer', 'base_unit' => 'kg',
         'sale_units' => 'bag=50', 'default_sale_unit' => 'bag', 'retail_price' => '9000', 'wholesale_price' => '8800',
         'reorder_level' => '100', 'reorder_qty' => '500', 'opening_stock' => '1250', 'cost' => '160',
         'batch_no' => 'L-2409', 'expiry_date' => '2027-06-30',
@@ -59,7 +59,7 @@ test('a clean file is previewed, then imported with units, prices and opening st
     $response = $this->actingAs($this->owner)->post(route('catalog.products.import.preview'), [
         'file' => importFile([
             ureaRow(),
-            ureaRow(['short_code' => '', 'name' => 'Bicycle Tyre 26"', 'name_si' => '', 'category' => 'Bicycle Parts > Tyres', 'brand' => 'DSI',
+            ureaRow(['short_code' => '', 'name' => 'Bicycle Tyre 26"', 'name_si' => '', 'category' => 'Plumbing > PVC Pipes', 'brand' => 'DSI',
                 'base_unit' => 'piece', 'sale_units' => '', 'default_sale_unit' => '', 'retail_price' => '2250', 'wholesale_price' => '',
                 'opening_stock' => '40', 'cost' => '1800', 'batch_no' => '', 'expiry_date' => '']),
         ]),
@@ -92,12 +92,12 @@ test('a clean file is previewed, then imported with units, prices and opening st
         ->and($opening->lot_no)->toBe('L-2409')
         ->and($opening->expiry_date->toDateString())->toBe('2027-06-30');
 
-    // The empty code got the first free code of the Bicycle Parts range.
-    expect(Product::firstWhere('name', 'Bicycle Tyre 26"')->short_code)->toBe('5000');
+    // The empty code got the first free code of the Plumbing range.
+    expect(Product::firstWhere('name', 'Bicycle Tyre 26"')->short_code)->toBe('20000');
 });
 
 test('rows with unknown units, unknown categories or duplicate codes are reported by row number', function () {
-    createProduct(['short_code' => '1005', 'category' => 'Fertilizers']);
+    createProduct(['short_code' => '1005', 'category' => 'Building Materials']);
 
     $response = $this->actingAs($this->owner)->post(route('catalog.products.import.preview'), [
         'file' => importFile([
@@ -141,7 +141,7 @@ test('an unknown token is rejected', function () {
 });
 
 test('sales staff cannot import', function () {
-    $this->actingAs(userWithRole(Role::SalesStaff))
+    $this->actingAs(userWithRole(Role::Cashier))
         ->post(route('catalog.products.import.preview'), ['file' => importFile([ureaRow()])])
         ->assertForbidden();
 });
@@ -169,7 +169,7 @@ test("the owner's price sheet imports as it is: every pack size is its own produ
         'cost' => 'Cost', 'wholesale_price' => 'Whole Sale Price', 'retail_price' => 'Selling Price', 'loose_price_kg' => "Price for Kg's",
         'loose_price_small' => 'Price for grams', 'reorder_level' => 'Reorder Level',
     ];
-    $first = ['category' => 'Seeds', 'brand' => 'Bathalagoda Agro'];
+    $first = ['category' => 'Fasteners', 'brand' => 'Bathalagoda Agro'];
 
     $response = previewAndImport(importFile([
         ['name' => 'Okra', 'name_si' => 'බණ්ඩක්කා(හරිත)', ...$first, 'base_unit' => 'packet', 'pack_size' => '10g packet', 'cost' => '72', 'retail_price' => '120', 'reorder_level' => '50'],
@@ -187,13 +187,13 @@ test("the owner's price sheet imports as it is: every pack size is its own produ
     expect($products->pluck('name')->all())->toBe(['Okra 10g packet', 'Okra 50g packet', 'Okra 100g packet', 'Okra 250g packet', 'Okra 10g', 'Okra 50g'])
         ->and($products->pluck('baseUnit.name')->unique()->values()->all())->toBe(['packet'])
         ->and($products[1]->name_si)->toBe('බණ්ඩක්කා(හරිත) 50g packet')
-        ->and($products[1]->category->name)->toBe('Seeds')
+        ->and($products[1]->category->name)->toBe('Fasteners')
         ->and($products[1]->brand->name)->toBe('Bathalagoda Agro')
         ->and($products[1]->reference_cost)->toBe('192.0000')
         ->and($products[1]->reorder_level)->toBe('15.000')
         ->and($book->forProduct($products[1]->id)[$retail->id][$products[1]->base_unit_id])->toBe('290.00')
         ->and($book->forProduct($products[3]->id))->toBe([])
-        ->and($products->pluck('short_code')->all())->toBe(['2000', '2001', '2002', '2003', '2004', '2005']);
+        ->and($products->pluck('short_code')->all())->toBe(['50000', '50001', '50002', '50003', '50004', '50005']);
 
     $warnings = $response->viewData('rowWarnings');
 
@@ -204,9 +204,9 @@ test("the owner's price sheet imports as it is: every pack size is its own produ
 
 test('a loose row gets both prices and a sealed bag in the same file opens into it', function () {
     previewAndImport(importFile([
-        ['name' => 'Urea', 'category' => 'Fertilizers', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'retail_price' => '12000', 'wholesale_price' => '11800', 'opens_into' => 'Urea (loose)'],
-        ['name' => 'Urea (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'cost' => '200', 'loose_price_kg' => '250', 'loose_price_small' => '300'],
-        ['name' => 'TSP (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'loose_price_kg' => '280'],
+        ['name' => 'Urea', 'category' => 'Building Materials', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'retail_price' => '12000', 'wholesale_price' => '11800', 'opens_into' => 'Urea (loose)'],
+        ['name' => 'Urea (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'cost' => '200', 'loose_price_kg' => '250', 'loose_price_small' => '300'],
+        ['name' => 'TSP (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'loose_price_kg' => '280'],
     ]));
 
     $retail = PriceList::firstWhere('name', 'Retail');
@@ -226,10 +226,10 @@ test('a loose row gets both prices and a sealed bag in the same file opens into 
 });
 
 test('a sealed bag can open into a loose product that is already in the shop', function () {
-    $loose = createProduct(['short_code' => '1100', 'name' => 'MOP (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'sold_loose' => true]);
+    $loose = createProduct(['short_code' => '1100', 'name' => 'MOP (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'sold_loose' => true]);
 
     previewAndImport(importFile([
-        ['name' => 'MOP', 'category' => 'Fertilizers', 'base_unit' => 'bag', 'pack_size' => '25kg bag', 'retail_price' => '6500', 'opens_into' => '1100'],
+        ['name' => 'MOP', 'category' => 'Building Materials', 'base_unit' => 'bag', 'pack_size' => '25kg bag', 'retail_price' => '6500', 'opens_into' => '1100'],
     ]));
 
     $bag = Product::firstWhere('name', 'MOP 25kg bag');
@@ -239,16 +239,16 @@ test('a sealed bag can open into a loose product that is already in the shop', f
 });
 
 test('loose prices, packs and links that do not make sense are reported', function () {
-    createProduct(['short_code' => '1200', 'name' => 'Dolomite 25kg bag', 'category' => 'Fertilizers', 'base_unit' => 'bag']);
+    createProduct(['short_code' => '1200', 'name' => 'Dolomite 25kg bag', 'category' => 'Building Materials', 'base_unit' => 'bag']);
 
     $response = $this->actingAs($this->owner)->post(route('catalog.products.import.preview'), [
         'file' => importFile([
-            ['name' => 'Urea (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'loose_price_kg' => '250', 'loose_price_small' => '30'],  // row 2: per 100 g
-            ['name' => 'TSP', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'pack_size' => '1kg packet', 'loose_price_kg' => '280'],         // row 3: pack and loose
-            ['name' => 'Urea', 'category' => 'Fertilizers', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'opens_into' => 'Urea loose'],      // row 4: unknown
-            ['name' => 'Dolomite', 'category' => 'Fertilizers', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'opens_into' => '1200'],        // row 5: not loose
-            ['name' => 'MOP (loose)', 'category' => 'Fertilizers', 'base_unit' => 'packet', 'loose_price_kg' => '300'],                          // row 6: not weighable
-            ['name' => 'Lime (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'retail_price' => '90', 'loose_price_small' => '100'],  // row 7: two small prices
+            ['name' => 'Urea (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'loose_price_kg' => '250', 'loose_price_small' => '30'],  // row 2: per 100 g
+            ['name' => 'TSP', 'category' => 'Building Materials', 'base_unit' => 'kg', 'pack_size' => '1kg packet', 'loose_price_kg' => '280'],         // row 3: pack and loose
+            ['name' => 'Urea', 'category' => 'Building Materials', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'opens_into' => 'Urea loose'],      // row 4: unknown
+            ['name' => 'Dolomite', 'category' => 'Building Materials', 'base_unit' => 'bag', 'pack_size' => '50kg bag', 'opens_into' => '1200'],        // row 5: not loose
+            ['name' => 'MOP (loose)', 'category' => 'Building Materials', 'base_unit' => 'packet', 'loose_price_kg' => '300'],                          // row 6: not weighable
+            ['name' => 'Lime (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'retail_price' => '90', 'loose_price_small' => '100'],  // row 7: two small prices
         ]),
     ])->assertOk();
 
@@ -265,11 +265,11 @@ test('loose prices, packs and links that do not make sense are reported', functi
 
 test('the export uses the import layout, with both loose prices', function () {
     $loose = createProduct(
-        ['short_code' => '1100', 'name' => 'Urea (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'sold_loose' => true],
+        ['short_code' => '1100', 'name' => 'Urea (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'sold_loose' => true],
         prices: ['Retail' => ['kg' => '300.00', 'kg@1' => '250.00'], 'Wholesale' => ['kg' => '240.00']],
     );
     createProduct(
-        ['short_code' => '1101', 'name' => 'Urea 50kg bag', 'category' => 'Fertilizers', 'base_unit' => 'bag', 'opens_into_product_id' => $loose->id, 'opens_into_qty' => '50'],
+        ['short_code' => '1101', 'name' => 'Urea 50kg bag', 'category' => 'Building Materials', 'base_unit' => 'bag', 'opens_into_product_id' => $loose->id, 'opens_into_qty' => '50'],
         prices: ['Retail' => ['bag' => '12000.00']],
     );
 

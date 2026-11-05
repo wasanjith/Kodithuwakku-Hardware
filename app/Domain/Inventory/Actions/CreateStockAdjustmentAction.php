@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Records a stock adjustment. Up to the approval limit (Settings → Inventory) it is
- * posted at once; above it, it waits for the Super Admin unless the creator may
+ * posted at once; above it, it waits for the Owner unless the creator may
  * approve adjustments.
  *
  * Expected $data (already validated):

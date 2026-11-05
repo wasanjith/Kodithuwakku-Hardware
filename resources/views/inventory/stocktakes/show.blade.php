@@ -45,7 +45,7 @@
     @endforeach
 
     @if ($stocktake->status === StocktakeStatus::Review && $needsApproval)
-        <x-ui.alert type="warning" class="mb-4">The differences are worth more than Rs. {{ number_format((float) $approvalLimit, 2) }}. The Super Admin has to post this stocktake.</x-ui.alert>
+        <x-ui.alert type="warning" class="mb-4">The differences are worth more than Rs. {{ number_format((float) $approvalLimit, 2) }}. The Owner has to post this stocktake.</x-ui.alert>
     @endif
 
     <div class="mb-6 grid gap-4 sm:grid-cols-3">

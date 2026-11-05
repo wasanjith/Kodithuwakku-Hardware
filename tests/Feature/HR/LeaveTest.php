@@ -83,7 +83,7 @@ test('staff withdraw their own waiting request but not someone else\'s', functio
     $this->actingAs($this->pos['staff'])->post(route('hr.leave.request'), ['leave_type_id' => $this->annual->id, 'from_date' => '2026-10-05']);
     $request = LeaveRequest::sole();
 
-    $other = userWithRole(Role::SalesStaff);
+    $other = userWithRole(Role::Cashier);
     $this->actingAs($other)->post(route('hr.leave.cancel', $request))->assertForbidden();
     $this->actingAs($this->pos['staff'])->post(route('hr.leave.cancel', $request))->assertSessionHasNoErrors();
 

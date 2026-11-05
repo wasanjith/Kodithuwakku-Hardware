@@ -25,13 +25,13 @@ beforeEach(function () {
     $this->seed([CatalogSeeder::class, DocumentSequenceSeeder::class]);
     $this->owner = userWithRole(Role::SuperAdmin);
     $this->manager = userWithRole(Role::Manager);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->loose = createProduct(
-        ['short_code' => '1100', 'name' => 'Urea (loose)', 'category' => 'Fertilizers', 'base_unit' => 'kg', 'sold_loose' => true],
+        ['short_code' => '1100', 'name' => 'Urea (loose)', 'category' => 'Building Materials', 'base_unit' => 'kg', 'sold_loose' => true],
         prices: ['Retail' => ['kg' => '300.00', 'kg@1' => '250.00']],
     );
     $this->bags = createProduct(
-        ['short_code' => '1101', 'name' => 'Urea 50kg bag', 'category' => 'Fertilizers', 'base_unit' => 'bag', 'opens_into_product_id' => $this->loose->id, 'opens_into_qty' => '50'],
+        ['short_code' => '1101', 'name' => 'Urea 50kg bag', 'category' => 'Building Materials', 'base_unit' => 'bag', 'opens_into_product_id' => $this->loose->id, 'opens_into_qty' => '50'],
         prices: ['Retail' => ['bag' => '12000.00']],
     );
     $this->stock = app(StockService::class);

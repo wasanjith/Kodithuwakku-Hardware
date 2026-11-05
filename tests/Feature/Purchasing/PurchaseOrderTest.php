@@ -19,7 +19,7 @@ beforeEach(function () {
     $this->seed([CatalogSeeder::class, DocumentSequenceSeeder::class]);
     $this->owner = userWithRole(Role::SuperAdmin);
     $this->manager = userWithRole(Role::Manager);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->supplier = Supplier::factory()->create(['name' => 'Lanka Fertilizer Co', 'phone' => '0771234567']);
     $this->urea = createUrea();
     $this->bag = Unit::firstWhere('name', 'bag');

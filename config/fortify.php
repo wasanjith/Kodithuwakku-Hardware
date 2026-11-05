@@ -161,7 +161,7 @@ return [
     */
 
     'features' => [
-        // Users are created by the Super Admin and passwords are reset from the user
+        // Users are created by the Owner and passwords are reset from the user
         // edit page, so self-registration and e-mail resets are disabled.
         Features::updatePasswords(),
         Features::twoFactorAuthentication([

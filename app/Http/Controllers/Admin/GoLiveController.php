@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Go-live: the readiness checklist and the import of customers and suppliers with the
- * balances from the old books (template → upload → preview → import). Super Admin only.
+ * balances from the old books (template → upload → preview → import). Owner only.
  */
 class GoLiveController extends Controller
 {

@@ -37,9 +37,9 @@ beforeEach(function () {
     waitForMeilisearch();
 
     createUrea();
-    createProduct(['short_code' => '1002', 'name' => 'Triple Super Phosphate (TSP) 50kg', 'name_si' => 'ටී.එස්.පී.', 'category' => 'Fertilizers']);
-    createProduct(['short_code' => '1003', 'name' => 'Muriate of Potash (MOP) 50kg', 'name_si' => 'එම්.ඕ.පී.', 'aliases' => 'mop', 'category' => 'Fertilizers']);
-    createProduct(['short_code' => '5001', 'name' => 'Bicycle Tyre', 'aliases' => 'tyre', 'category' => 'Tyres'], variants: [
+    createProduct(['short_code' => '1002', 'name' => 'Triple Super Phosphate (TSP) 50kg', 'name_si' => 'ටී.එස්.පී.', 'category' => 'Building Materials']);
+    createProduct(['short_code' => '1003', 'name' => 'Muriate of Potash (MOP) 50kg', 'name_si' => 'එම්.ඕ.පී.', 'aliases' => 'mop', 'category' => 'Building Materials']);
+    createProduct(['short_code' => '5001', 'name' => 'Bicycle Tyre', 'aliases' => 'tyre', 'category' => 'PVC Pipes'], variants: [
         ['short_code' => '5002', 'name' => '26"', 'is_active' => true],
         ['short_code' => '5003', 'name' => '28"', 'is_active' => true],
     ]);
@@ -86,8 +86,8 @@ test('inactive products are left out', function () {
 });
 
 test('fast sellers rank first among equal matches', function () {
-    createProduct(['short_code' => '4001', 'name' => 'Knapsack Sprayer 16L', 'category' => 'Tools']);
-    $fast = createProduct(['short_code' => '4002', 'name' => 'Knapsack Sprayer 20L', 'category' => 'Tools']);
+    createProduct(['short_code' => '4001', 'name' => 'Knapsack Sprayer 16L', 'category' => 'Hand Tools']);
+    $fast = createProduct(['short_code' => '4002', 'name' => 'Knapsack Sprayer 20L', 'category' => 'Hand Tools']);
     Product::whereKey($fast->id)->update(['sales_velocity_30d' => 50]);
     $fast->refresh()->searchable();
     waitForMeilisearch();

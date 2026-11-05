@@ -104,7 +104,7 @@ class CategoryController extends Controller
     }
 
     /**
-     * Select options in tree order: [id => "Bicycle Parts › Tyres"].
+     * Select options in tree order: [id => "Plumbing › PVC Pipes"].
      *
      * @return array<int, string>
      */

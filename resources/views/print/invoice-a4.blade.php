@@ -41,7 +41,7 @@
             <div class="muted">{{ $primary === 'si' ? ($shop['address_si'] ?: $shop['address_en']) : $shop['address_en'] }}</div>
             <div class="muted">{{ $shop['phone'] }}</div>
             @if (! empty($invoice['is_sample']))<div class="sample">{{ $t('sample') }}</div>@endif
-            @if (! empty($invoice['is_copy']))<div class="sample">{{ __('receipt.copy', [], 'si') }} / {{ __('receipt.copy', [], 'en') }}</div>@endif
+            @if (! empty($invoice['is_copy']))<div class="sample">{{ $t('copy') }}</div>@endif
             @if (! empty($invoice['is_void']))<div class="sample">{{ $t('void') }}</div>@endif
         </div>
         <table class="meta">

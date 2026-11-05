@@ -97,6 +97,8 @@ test('open quotations can be found by number or customer name', function () {
 });
 
 test('the 80 mm quotation prints in Sinhala; back-office pages render; the writer can cancel it', function () {
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+
     quoteAtCounter($this->pos, $this->lines, ['customer_name' => 'Ranjith'])->assertCreated();
     $quotation = Quotation::sole();
     $job = PrintJob::where('document_type', PrintDocumentType::Quotation)->sole();
@@ -118,7 +120,7 @@ test('the 80 mm quotation prints in Sinhala; back-office pages render; the write
 
 test('another staff member cannot cancel someone else\'s quotation', function () {
     quoteAtCounter($this->pos, $this->lines)->assertCreated();
-    $other = userWithRole(Role::SalesStaff);
+    $other = userWithRole(Role::Cashier);
 
     $this->actingAs($other)->post(route('quotations.cancel', Quotation::sole()))->assertForbidden();
     expect(Sale::count())->toBe(0);

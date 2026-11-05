@@ -8,7 +8,7 @@ use App\Models\User;
 class CustomerPolicy
 {
     /**
-     * Customer list, balances and statements. Sales Staff may look, not change.
+     * Customer list, balances and statements. Cashiers may look, not change.
      */
     public function viewAny(User $user): bool
     {

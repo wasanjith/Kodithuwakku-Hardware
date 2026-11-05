@@ -32,13 +32,15 @@
                 <div x-show="type === 'counter'">
                     <x-ui.input name="counter_no" label="Counter number" type="number" min="1" max="9" :value="$terminal->counter_no" />
                 </div>
-                <x-ui.select
-                    name="receipt_language"
-                    label="Invoice language on this terminal"
-                    :options="['si' => 'Sinhala', 'en' => 'English', 'si+en' => 'Sinhala + English']"
-                    :value="$terminal->receipt_language"
-                    placeholder="Use shop setting"
-                />
+                @if (config('pos.sinhala_fields'))
+                    <x-ui.select
+                        name="receipt_language"
+                        label="Invoice language on this terminal"
+                        :options="['si' => 'Sinhala', 'en' => 'English', 'si+en' => 'Sinhala + English']"
+                        :value="$terminal->receipt_language"
+                        placeholder="Use shop setting"
+                    />
+                @endif
                 <x-ui.checkbox name="is_active" label="Active" :checked="$terminal->is_active" class="sm:col-span-2" />
             </div>
 

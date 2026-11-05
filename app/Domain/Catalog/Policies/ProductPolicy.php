@@ -46,7 +46,7 @@ class ProductPolicy
     }
 
     /**
-     * Cost prices and margins. Hidden from Sales Staff everywhere (pages, JSON, exports).
+     * Cost prices and margins. Hidden from Cashiers everywhere (pages, JSON, exports).
      */
     public function viewCost(User $user): bool
     {

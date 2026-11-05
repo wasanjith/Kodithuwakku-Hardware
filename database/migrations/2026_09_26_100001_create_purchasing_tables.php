@@ -69,7 +69,7 @@ return new class extends Migration
             $table->foreignId('unit_id')->constrained()->restrictOnDelete();
             $table->decimal('qty', 14, 3);
             $table->decimal('base_qty', 14, 3);
-            // Cost per purchase unit. Null until a Manager/Owner fills it (Sales Staff never see it).
+            // Cost per purchase unit. Null until a Manager/Owner fills it (Cashiers never see it).
             $table->decimal('unit_cost', 15, 2)->nullable();
             $table->decimal('received_base_qty', 14, 3)->default(0);
             $table->decimal('line_total', 15, 2)->default(0);

@@ -329,8 +329,10 @@
         <div x-show="tab === 'names'" x-cloak>
             <x-ui.card title="Search & names" description="Everything staff might type to find this product.">
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.input name="name_si" label="Sinhala name" :value="$product->name_si" class="font-sinhala" />
-                    <x-ui.input name="name_ta" label="Tamil name" :value="$product->name_ta" />
+                    @if (config('pos.sinhala_fields'))
+                        <x-ui.input name="name_si" label="Sinhala name" :value="$product->name_si" class="font-sinhala" />
+                        <x-ui.input name="name_ta" label="Tamil name" :value="$product->name_ta" />
+                    @endif
                     <x-ui.textarea
                         name="aliases"
                         label="Aliases"

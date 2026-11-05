@@ -5,7 +5,7 @@ namespace App\Domain\HR\Policies;
 use App\Models\User;
 
 /**
- * Employees, shifts, holidays and leave types: Super Admin only (never delegated).
+ * Employees, shifts, holidays and leave types: Owner only (never delegated).
  */
 class EmployeePolicy
 {

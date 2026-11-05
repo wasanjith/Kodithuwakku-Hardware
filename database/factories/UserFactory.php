@@ -61,8 +61,8 @@ class UserFactory extends Factory
         return $this->withRole(Role::Manager);
     }
 
-    public function salesStaff(): static
+    public function cashier(): static
     {
-        return $this->withRole(Role::SalesStaff);
+        return $this->withRole(Role::Cashier);
     }
 }

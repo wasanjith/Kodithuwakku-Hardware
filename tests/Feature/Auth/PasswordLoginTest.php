@@ -57,7 +57,7 @@ test('inactive users cannot sign in', function () {
 });
 
 test('a user deactivated while signed in is signed out on the next request', function () {
-    $user = userWithRole(Role::SalesStaff);
+    $user = userWithRole(Role::Cashier);
 
     $this->actingAs($user);
     $user->update(['is_active' => false]);

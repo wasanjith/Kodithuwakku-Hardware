@@ -9,7 +9,7 @@ use App\Domain\Identity\Services\TerminalRegistrar;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
-test('the Super Admin registers the current browser as a terminal', function () {
+test('the Owner registers the current browser as a terminal', function () {
     $owner = userWithRole(Role::SuperAdmin);
     $terminal = Terminal::factory()->mainCashier()->create();
 
@@ -52,14 +52,14 @@ test('terminal and printer policies are attached to their models', function () {
         ->and(Gate::getPolicyFor(Printer::class))->toBeInstanceOf(PrinterPolicy::class);
 });
 
-test('only the Super Admin can manage terminals', function (Role $role) {
+test('only the Owner can manage terminals', function (Role $role) {
     $terminal = Terminal::factory()->create();
 
     $this->actingAs(userWithRole($role));
 
     $this->get(route('admin.terminals.index'))->assertForbidden();
     $this->post(route('admin.terminals.register.store', $terminal))->assertForbidden();
-})->with([Role::Manager, Role::SalesStaff]);
+})->with([Role::Manager, Role::Cashier]);
 
 test('terminal-type middleware allows only the matching terminal', function () {
     Route::middleware(['web', 'terminal:main_cashier'])->get('/_test/main-only', fn () => 'ok');
@@ -71,7 +71,7 @@ test('terminal-type middleware allows only the matching terminal', function () {
     $this->withCookie(deviceCookie(), $mainToken)->get('/_test/main-only')->assertOk();
 });
 
-test('the Super Admin creates and edits terminals', function () {
+test('the Owner creates and edits terminals', function () {
     $this->actingAs(userWithRole(Role::SuperAdmin));
 
     $this->post(route('admin.terminals.store'), [

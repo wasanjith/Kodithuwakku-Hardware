@@ -20,7 +20,7 @@ test('every back-office page renders for the owner', function (string $route, ar
     'account' => ['account'],
     'users' => ['admin.users.index'],
     'user create' => ['admin.users.create'],
-    'user edit' => ['admin.users.edit', ['user' => fn () => userWithRole(Role::SalesStaff)]],
+    'user edit' => ['admin.users.edit', ['user' => fn () => userWithRole(Role::Cashier)]],
     'terminals' => ['admin.terminals.index'],
     'terminal create' => ['admin.terminals.create'],
     'terminal edit' => ['admin.terminals.edit', ['terminal' => fn () => Terminal::firstOrFail()]],

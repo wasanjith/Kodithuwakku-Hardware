@@ -16,11 +16,11 @@ use Database\Seeders\DocumentSequenceSeeder;
 beforeEach(function () {
     $this->seed([CatalogSeeder::class, DocumentSequenceSeeder::class]);
     $this->manager = userWithRole(Role::Manager);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->supplier = Supplier::factory()->create(['name' => 'Bathalagoda Agro']);
-    $this->okra = createProduct(['name' => 'Okra Haritha 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
-    $this->beans = createProduct(['name' => 'Bonchi Bean 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
-    $this->chili = createProduct(['name' => 'Chili MI-2 10g packet', 'category' => 'Seeds', 'base_unit' => 'packet']);
+    $this->okra = createProduct(['name' => 'Okra Haritha 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet']);
+    $this->beans = createProduct(['name' => 'Bonchi Bean 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet']);
+    $this->chili = createProduct(['name' => 'Chili MI-2 10g packet', 'category' => 'Fasteners', 'base_unit' => 'packet']);
     $this->supplier->products()->attach([$this->okra->id, $this->beans->id]);
 });
 
@@ -79,7 +79,7 @@ test('a new supplier can be added from the purchase order form', function () {
 });
 
 test('a new product of a new brand is created, linked to the supplier and returned as a line', function () {
-    $seeds = Category::firstWhere('name', 'Seeds');
+    $seeds = Category::firstWhere('name', 'Fasteners');
     $packet = Unit::firstWhere('name', 'packet');
 
     $item = $this->actingAs($this->manager)
@@ -101,7 +101,7 @@ test('a new product of a new brand is created, linked to the supplier and return
 
     $product = Product::with(['brand', 'units'])->findOrFail($item['id']);
 
-    expect($product->short_code)->toBe('2000')
+    expect($product->short_code)->toBe('50000')
         ->and($product->category_id)->toBe($seeds->id)
         ->and($product->reference_cost)->toBe('90.0000')
         ->and($product->reorder_level)->toBe('20.000')
@@ -124,7 +124,7 @@ test('a quick product can use an existing brand and needs a name and category', 
 
     $item = $this->postJson(route('purchasing.purchase-orders.quick-product'), [
         'name' => 'Big Onion Seeds 50g packet',
-        'category_id' => Category::firstWhere('name', 'Seeds')->id,
+        'category_id' => Category::firstWhere('name', 'Fasteners')->id,
         'brand_id' => $brand->id,
         'base_unit_id' => Unit::firstWhere('name', 'packet')->id,
     ])->assertCreated()->json();
@@ -137,7 +137,7 @@ test('sales staff cannot create products from the purchase order form', function
     $this->actingAs($this->staff)
         ->postJson(route('purchasing.purchase-orders.quick-product'), [
             'name' => 'Anything',
-            'category_id' => Category::firstWhere('name', 'Seeds')->id,
+            'category_id' => Category::firstWhere('name', 'Fasteners')->id,
             'base_unit_id' => Unit::firstWhere('name', 'packet')->id,
         ])
         ->assertForbidden();
@@ -147,15 +147,15 @@ test('the demo suppliers are linked to the products of their brand', function ()
     Supplier::query()->forceDelete();
     $this->seed([ChartOfAccountsSeeder::class, DevelopmentCatalogSeeder::class, DevelopmentSupplierSeeder::class]);
 
-    $bathalagoda = Supplier::firstWhere('name', 'Bathalagoda Agro');
-    $ishara = Supplier::firstWhere('name', 'Ishara Lak Seeds');
+    $building = Supplier::firstWhere('name', 'Lanka Building Supplies');
+    $electrical = Supplier::firstWhere('name', 'Electrical Wholesale');
 
-    expect(Supplier::orderBy('name')->pluck('name')->all())->toBe(['Bathalagoda Agro', 'CIC', 'Ishara Lak Seeds'])
-        ->and($bathalagoda->products()->count())->toBe(43)
-        ->and($ishara->products()->pluck('name')->sort()->values()->all())->toBe([
-            'Chili MI-2 100g packet', 'Chili MI-2 10g packet', 'Chili MI-2 250g packet', 'Chili MI-2 50g packet', 'Chili MI-2 5g packet',
-            'Radish Ishara Lak 10g packet', 'Radish Ishara Lak 5g packet',
+    expect(Supplier::orderBy('name')->pluck('name')->all())->toBe(['Electrical Wholesale', 'Lanka Building Supplies', 'Pipe & Fittings Distributors', 'Tools & Paints Agency'])
+        ->and($building->products()->count())->toBe(6)
+        ->and(Supplier::firstWhere('name', 'Pipe & Fittings Distributors')->products()->count())->toBe(10)
+        ->and($electrical->products()->pluck('name')->sort()->values()->all())->toBe([
+            'LED Bulb 9W', 'MCB 32A Single Pole', 'Socket 13A', 'Switch 1 Gang',
+            'Wire 1.5mm (per m)', 'Wire 1.5mm 90m roll', 'Wire 2.5mm (per m)', 'Wire 2.5mm 90m roll',
         ])
-        ->and(Supplier::firstWhere('name', 'CIC')->products()->count())->toBe(0)
-        ->and((string) $bathalagoda->balance())->toBe('150000.00');
+        ->and((string) $building->balance())->toBe('150000.00');
 });

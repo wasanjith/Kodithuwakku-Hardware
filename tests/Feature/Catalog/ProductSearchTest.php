@@ -16,9 +16,9 @@ use Meilisearch\Client;
 
 beforeEach(function () {
     $this->seed(CatalogSeeder::class);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->urea = createUrea();
-    createProduct(['short_code' => '10010', 'name' => 'Urea sprayer nozzle', 'category' => 'Tools']);
+    createProduct(['short_code' => '10010', 'name' => 'Urea sprayer nozzle', 'category' => 'Hand Tools']);
 });
 
 test('an exact short code returns only that product', function () {
@@ -33,7 +33,7 @@ test('an exact short code returns only that product', function () {
 });
 
 test('a variant code returns that variant', function () {
-    createProduct(['short_code' => '5001', 'name' => 'Bicycle Tyre', 'category' => 'Tyres'], variants: [
+    createProduct(['short_code' => '5001', 'name' => 'Bicycle Tyre', 'category' => 'PVC Pipes'], variants: [
         ['short_code' => '5002', 'name' => '26"', 'is_active' => true],
         ['short_code' => '5003', 'name' => '28"', 'is_active' => true],
     ]);
@@ -122,8 +122,8 @@ test('the same item from several brands can be found by brand and narrowed to on
     $lanka = Brand::create(['name' => 'Lanka Fertilizer']);
     $baur = Brand::create(['name' => 'Baur']);
     $this->urea->update(['brand_id' => $lanka->id]);
-    $baurUrea = createProduct(['short_code' => '1005', 'name' => 'Urea 50kg', 'brand_id' => $baur->id, 'category' => 'Fertilizers']);
-    createProduct(['short_code' => '1006', 'name' => 'Baur Mix 1kg', 'category' => 'Fertilizers']);
+    $baurUrea = createProduct(['short_code' => '1005', 'name' => 'Urea 50kg', 'brand_id' => $baur->id, 'category' => 'Building Materials']);
+    createProduct(['short_code' => '1006', 'name' => 'Baur Mix 1kg', 'category' => 'Building Materials']);
 
     $all = $this->actingAs($this->staff)->getJson(route('api.pos.search', ['q' => 'urea']))->assertOk();
     expect(collect($all->json('brands'))->pluck('name')->all())->toEqualCanonicalizing(['Lanka Fertilizer', 'Baur'])

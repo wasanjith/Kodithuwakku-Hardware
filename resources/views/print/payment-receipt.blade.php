@@ -21,7 +21,7 @@
         @if ($shop['phone'])<div class="muted">{{ $shop['phone'] }}</div>@endif
         <div class="grand-total" style="margin-top: 1mm">{{ $t('payment_receipt') }}</div>
         @if ($isCopy)
-            <div><span class="badge">{{ __('receipt.copy', [], 'si') }} / {{ __('receipt.copy', [], 'en') }}</span></div>
+            <div><span class="badge">{{ $t('copy') }}</span></div>
         @endif
     </div>
 

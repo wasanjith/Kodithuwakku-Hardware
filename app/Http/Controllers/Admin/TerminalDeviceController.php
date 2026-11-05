@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\View\View;
 
 /**
- * Registers the browser the Super Admin is using as the given terminal.
+ * Registers the browser the Owner is using as the given terminal.
  */
 class TerminalDeviceController extends Controller
 {

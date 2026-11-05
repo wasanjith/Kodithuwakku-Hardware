@@ -32,6 +32,23 @@
 | Modules | Keep all Citizens modules (purchasing, finance, banks, cheques, HR/payroll, reports). |
 | Setup | Same as Citizens (on-site server, thermal printers, Tailscale). |
 
+### 1.1 Answers to the open questions (2026-11-05)
+
+| # | Question | Answer → what we build |
+|---|---|---|
+| 1 | Counter scanning | **USB barcode reader at every counter.** The **phone camera** is for **photographing supplier invoices** and filing them in the supplier's folder (not for barcodes). See § 3.2. |
+| 2 | Where the products are now | **In written books.** No old POS and no Excel. The list is typed in before go-live (§ 3.13). Barcodes are added while receiving goods and selling (§ 3.1). |
+| 3 | Opening balances | **Yes**, supplier and credit-customer balances. The Citizens go-live import (Admin → Go-live: template → upload → preview → import) already does this. |
+| 4 | Terminals | **Main server machine + 4 counters** (5 terminals). Payment settings are made from the main machine. |
+| 5 | Who settles | **Both:** the main machine settles bills sent by counters, **and** a counter with its **own cash drawer** settles its own bills. So the choice is **per counter** ("this counter has a cash drawer and takes payment"), not one shop-wide toggle. See § 3.3. |
+| 6 | Discount limits | Default taken: **Cashier 10 %, Manager 25 %**; more than that needs the **Owner's** approval (existing override). Can be changed in Settings → POS rules. |
+| 7 | VAT | "Yes" taken as: **shelf prices include VAT**, some items are **VAT-exempt** (VAT set per product), contractors get tax invoices with their VAT number. The shop's VAT number comes with the shop details (12). |
+| 8 | Price lists | **Retail, Wholesale, Contractor** (seeded). |
+| 9 | Paint tinting | **Tinting charge: yes. Colour saved per customer: yes.** |
+| 10 | Delivery | Default taken: **own vehicle**, transport charge **typed per delivery** (a default amount in Settings), **pay now, collect or deliver later** supported (goods kept reserved). |
+| 11 | Serial numbers | **Yes.** Default taken: a per-product "track serial numbers" tick (power tools, pumps/motors, electricals with warranty); the claim register handles repair by the shop **or** by the supplier. |
+| 12 | Shop details | Owner will **upload** logo, address, phone, VAT number and invoice footer. |
+
 ---
 
 ## 2. What is reused unchanged
@@ -54,21 +71,25 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 - Duplicate barcode = refused with the name of the product that already has it.
 - Sounds: short beep when found, low buzz when not found (Web Audio, no files).
 
-### 3.2 Phone camera scanning
+### 3.2 Phone camera: supplier invoice photos (owner's answer 1)
 
-- Phone pages for **stocktake count** and **goods receipt** with a camera scanner (browser `BarcodeDetector`, with the ZXing JS library as a fallback for iPhones/old Android).
-- **Browsers only allow the camera on HTTPS.** The shop server needs a local HTTPS certificate (Tailscale HTTPS certificate, or a local CA such as mkcert installed on the phones). This goes into the deployment guide.
-- Counters: see open question 1 (I recommend a USB scanner at each counter, because a phone is too slow for billing).
+- Counters use **USB barcode readers** (keyboard mode). No phone barcode scanning is planned.
+- New phone page **"Snap supplier invoice"**: pick the supplier (search), optional invoice number / date / amount, take one or more photos → saved in that **supplier's documents folder** (Citizens already has supplier documents and GRN invoice photos), and can be linked to a GRN later.
+- Uses the phone's own camera app through a file input (`accept="image/*" capture="environment"`). This works on plain **HTTP** inside the shop network, so **no HTTPS certificate is needed** for it (only a live camera stream inside the browser needs HTTPS).
+- Photos are shrunk on the phone before upload (about 1600 px, JPEG) so they upload fast over Wi-Fi.
 
-### 3.3 Two sales flows (owner's toggle)
+### 3.3 Two sales flows, chosen per counter (owner's answers 4 and 5)
 
-- Settings → POS → **"Who takes the payment"**: *Main cashier settles* (Citizens) or *Counter takes payment*.
-- In "Counter takes payment", F9 opens the payment box at the counter (cash / card / transfer / cheque / credit), and each counter has its **own drawer session** (opening float, count, Z report). Live Billing works in both modes.
-- The setting can only change when no counter has an open bill or drawer.
+- 5 terminals: **MAIN** (main server machine, main cashier) + **C1–C4** counters (seeded in H1).
+- Per counter, on Admin → Terminals (set from the main machine): **"This counter has a cash drawer and takes payment"**. The printer record already has a `has_cash_drawer` flag.
+  - **Off** (Citizens flow): the counter prints the bill and the **main machine settles** it.
+  - **On**: F9 opens the payment box at the counter (cash / card / transfer / cheque / credit); the counter has its **own drawer session** (opening float, count, Z report) and opens its own drawer.
+- Either way the main machine can still settle any open bill (e.g. a customer who walks to the main cashier). Live Billing works in both.
+- The setting can only change when that counter has no open bill and no open drawer.
 
 ### 3.4 Roles
 
-`super_admin` (Owner), `manager`, `cashier` (rename of Sales Staff, see open question 5). The permission matrix test is updated with them.
+`super_admin` (shown as **Owner**), `manager`, `cashier` (was Sales Staff). Done in H1. The person at the main machine settles with `pos.settle` (the Owner, or a Manager/Cashier through a handover, as in Citizens). A cashier on a drawer counter gets settle rights for **their own counter's bills only** (H3).
 
 ### 3.5 Units and quantities
 
@@ -79,12 +100,13 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 
 - Price lists: **Retail** (default), **Wholesale**, **Contractor** + **customer special price** (per customer per product).
 - **Bulk price change:** filter by category / brand / supplier → raise or lower by % or amount, round to Rs. 1 / 5 / 10, preview → apply. Every change saved in a price history (who, when, old → new).
-- Discount limits: see open question 6 (25 %).
+- Discount limits (H1): Cashier 10 %, Manager 25 %; above that the Owner approves.
 
 ### 3.7 VAT (shop is VAT-registered)
 
 - VAT 18 % active by default. Tax invoice layout: shop VAT number, invoice number, date, customer name + VAT number (when given), VAT amount, total incl. VAT.
-- VAT summary report for the monthly return. See open question 7.
+- Shelf prices **include VAT**; VAT-exempt products have no tax. VAT is set per product (bulk-set by category).
+- VAT summary report for the monthly return.
 
 ### 3.8 Serial numbers and warranty
 
@@ -94,12 +116,12 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 
 ### 3.9 Paint tinting
 
-- A tinted paint = **base paint product** + colour code/name (+ optional tinting charge line). The colour code prints on the invoice and is saved on the customer, so a repeat order can be mixed again. See open question 9.
+- A tinted paint = **base paint product** + colour code/name + **tinting charge** line. The colour code prints on the invoice and is **saved on the customer**, so a repeat order can be mixed again.
 
 ### 3.10 Delivery of heavy goods
 
 - On an invoice: "Deliver" tick, address, delivery date, transport charge line.
-- **Delivery note** (printed, signed by the customer) and a **pending deliveries** list. Goods paid now and collected later stay reserved. See open question 10.
+- **Delivery note** (printed, signed by the customer) and a **pending deliveries** list. Own vehicle; the transport charge is typed per delivery (default amount in Settings). Goods paid now and collected or delivered later stay reserved.
 
 ### 3.11 Quotation maker (back office)
 
@@ -110,8 +132,10 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 
 - Receipt language **English** by default. Sinhala name fields hidden on forms (columns kept, empty). Thermal invoices can print as plain text (faster) instead of an image; the Chrome image path stays as a fallback.
 
-### 3.13 10,000+ products
+### 3.13 10,000+ products, typed in from the books
 
+- The list is in **written books**, so it has to be typed in. Two ways, both already in the Citizens code: the **Excel template** (Catalogue → Import; several people can type at once, one sheet per category) and the product form. Start with the fast sellers; the rest can be added when goods arrive (GRN quick-add) or are sold.
+- Short codes are **5 digits** from the category range (Building Materials 10000–14999, Plumbing 20000–24999 …); barcodes are scanned in on the GRN or at the first sale.
 - Import in chunks on the queue with a progress bar and an error file, re-runnable. Meilisearch indexes in the background. Product list pages are paginated server-side with filters (already). Checked with a seeded 15,000-product test catalogue before go-live (search < 50 ms, POS add < 150 ms).
 
 ---
@@ -121,29 +145,18 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 | Phase | Work |
 |---|---|
 | **H0** | Copy project, own identity (DB, prefixes, ports, cookies), tests green. *(done 2026-11-05)* |
-| **H1** | Hardware catalogue base: categories + code ranges, new units, English-only, roles (cashier), hardware demo data, logo + shop details. |
+| **H1** | Hardware catalogue base: categories + code ranges, new units, English-only, roles (cashier), hardware demo data, logo + shop details. *(done 2026-11-05 except the logo and shop details, waiting for the owner's upload)* |
 | **H2** | **Barcodes**: column, product form/import/list, POS scan flow (scan → qty box), unknown-barcode linking, GRN/stocktake/returns scanning, sounds. |
-| **H3** | Two sales flows toggle + counter drawers. |
+| **H3** | Per-counter payment (drawer counters settle their own bills) + counter drawer sessions. |
 | **H4** | Prices: contractor list, customer special prices, bulk price change + history, discount limits. VAT invoices + VAT report. |
 | **H5** | Quotation maker. |
 | **H6** | Serial numbers + warranty + claims. |
 | **H7** | Delivery notes + pending deliveries. Paint tinting. |
-| **H8** | Phone camera scanning (HTTPS on the shop server), 15,000-product performance check. |
+| **H8** | Phone page to photograph supplier invoices into the supplier's folder, 15,000-product performance check. |
 | **H9** | Go-live: real product import, opening stock, balances, hardware install, training, parallel run. |
 
 ---
 
 ## 5. Open questions
 
-1. **Counter scanning:** the answer to "which scanner" was *phone cam*. Should the **counters** also use a phone camera, or a **USB scanner at each counter + phone camera for stocktake / goods receipts**? I recommend the USB scanner at the counters (about Rs. 8,000–15,000 each; one press, under half a second). A phone needs to be unlocked and pointed every time.
-2. **Product list:** where are the 10,000 products now? (Old POS software and its name / Excel / paper.) Does it have barcodes, cost and selling prices, stock?
-3. **Opening balances:** are there supplier and credit-customer balances to bring in? Roughly how many?
-4. **Sales-flow toggle:** one setting for the whole shop, or chosen **per counter** (e.g. Counter 1 takes payments, Counters 2–3 send to the cashier)? How many counters?
-5. **Cashier role:** is "Cashier" the person at each counter who bills? In the "main cashier settles" flow, who settles: the Owner, the Manager, or a main cashier?
-6. **Discount 25 %:** is that the cashier's limit? What is the Manager's limit, and does anything above need the Owner's OK?
-7. **VAT:** do shelf prices **include** VAT? Shop VAT number? Any VAT-exempt items? Do contractors ask for tax invoices with their VAT number?
-8. **Price lists:** are Retail, Wholesale and Contractor the right names? Any others?
-9. **Paint tinting:** is there a tinting charge? Do you sell by base + colour code (from a colour card), and should the colour mix be saved per customer?
-10. **Delivery:** own vehicle? Fixed charge, per km, or by weight? Do customers pay now and collect later?
-11. **Serial numbers:** which items (power tools, motors, pumps, electricals)? Does the shop or the supplier handle the warranty repair?
-12. **Shop details:** logo file, shop address, phone, VAT number, invoice footer text.
+All 12 were answered on 2026-11-05 (see § 1.1). Still waiting for the **logo file and shop details** (address, phone, VAT number, invoice footer).

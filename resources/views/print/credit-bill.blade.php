@@ -22,8 +22,8 @@
         <div class="shop-name">{{ $primary === 'si' ? $shop['name_si'] : $shop['name_en'] }}</div>
         @if ($address = $primary === 'si' ? ($shop['address_si'] ?: $shop['address_en']) : $shop['address_en'])<div class="muted">{{ $address }}</div>@endif
         @if ($shop['phone'])<div class="muted">{{ $shop['phone'] }}</div>@endif
-        <div class="grand-total" style="margin-top: 1mm">{{ __('receipt.credit_bill', [], 'si') }} / {{ __('receipt.credit_bill', [], 'en') }}</div>
-        <div><span class="badge">{{ $isCopy ? __('receipt.copy', [], 'si').' / '.__('receipt.copy', [], 'en') : $t('shop_copy') }}</span></div>
+        <div class="grand-total" style="margin-top: 1mm">{{ $t('credit_bill') }}</div>
+        <div><span class="badge">{{ $isCopy ? $t('copy') : $t('shop_copy') }}</span></div>
     </div>
 
     <hr class="rule">

@@ -44,7 +44,7 @@ class PostStocktakeAction
             $limit = BigDecimal::of((string) $this->settings->get('inventory.adjustment_approval_limit', 0));
 
             if (self::varianceValue($lines)->isGreaterThan($limit) && ! $actor->can('inventory.adjust.approve')) {
-                throw ValidationException::withMessages(['status' => 'The differences are worth more than Rs. '.number_format((float) (string) $limit, 2).'. The Super Admin has to post this stocktake.']);
+                throw ValidationException::withMessages(['status' => 'The differences are worth more than Rs. '.number_format((float) (string) $limit, 2).'. The Owner has to post this stocktake.']);
             }
 
             foreach ($lines as $line) {

@@ -30,10 +30,10 @@ class DevelopmentHrSeeder extends Seeder
         ]);
 
         $people = [
-            ['username' => 'manager', 'full_name' => 'Sunil Perera', 'name_si' => 'සුනිල් පෙරේරා', 'designation' => 'Shop manager', 'basic_salary' => '65000', 'epf_no' => '101'],
-            ['username' => 'staff1', 'full_name' => 'Nimal Bandara', 'name_si' => 'නිමල් බණ්ඩාර', 'designation' => 'Sales assistant', 'basic_salary' => '42000', 'epf_no' => '102'],
-            ['username' => 'staff2', 'full_name' => 'Kamala Herath', 'name_si' => 'කමලා හේරත්', 'designation' => 'Sales assistant', 'basic_salary' => '40000', 'epf_no' => '103'],
-            ['username' => 'staff3', 'full_name' => 'Ruwan Dissanayake', 'name_si' => 'රුවන් දිසානායක', 'designation' => 'Sales assistant', 'basic_salary' => '38000', 'epf_no' => null],
+            ['username' => 'manager', 'full_name' => 'Sunil Perera', 'designation' => 'Shop manager', 'basic_salary' => '65000', 'epf_no' => '101'],
+            ['username' => 'staff1', 'full_name' => 'Nimal Bandara', 'designation' => 'Cashier', 'basic_salary' => '42000', 'epf_no' => '102'],
+            ['username' => 'staff2', 'full_name' => 'Kamala Herath', 'designation' => 'Cashier', 'basic_salary' => '40000', 'epf_no' => '103'],
+            ['username' => 'staff3', 'full_name' => 'Ruwan Dissanayake', 'designation' => 'Cashier', 'basic_salary' => '38000', 'epf_no' => null],
         ];
 
         foreach ($people as $person) {

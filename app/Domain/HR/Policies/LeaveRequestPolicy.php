@@ -7,7 +7,7 @@ use App\Domain\HR\Models\LeaveRequest;
 use App\Models\User;
 
 /**
- * Staff ask for leave for themselves; the Super Admin approves or rejects it and can
+ * Staff ask for leave for themselves; the Owner approves or rejects it and can
  * enter leave for anyone. The Manager sees the list.
  */
 class LeaveRequestPolicy

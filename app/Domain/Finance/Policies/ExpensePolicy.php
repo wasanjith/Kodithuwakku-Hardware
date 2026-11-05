@@ -6,7 +6,7 @@ use App\Domain\Finance\Enums\PaidFrom;
 use App\Models\User;
 
 /**
- * Expenses. The Manager records petty cash from the drawer only; the Super Admin pays
+ * Expenses. The Manager records petty cash from the drawer only; the Owner pays
  * from the safe or a bank too, cancels expenses and manages the categories.
  */
 class ExpensePolicy

@@ -167,7 +167,7 @@ class SettleInvoiceAction
 
     /**
      * A credit settlement needs the customer on the invoice and room under their credit
-     * limit. Only the Super Admin can let it go over (never a delegate).
+     * limit. Only the Owner can let it go over (never a delegate).
      */
     private function checkCredit(Sale $sale, User $cashier, bool $override): Customer
     {

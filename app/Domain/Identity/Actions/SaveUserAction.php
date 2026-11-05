@@ -54,7 +54,7 @@ class SaveUserAction
     }
 
     /**
-     * The shop must always keep at least one active Super Admin, and nobody may
+     * The shop must always keep at least one active Owner, and nobody may
      * deactivate or demote themselves.
      */
     private function guardAgainstLockingOut(User $user, Role $role, bool $isActive, ?User $actingUser): void
@@ -79,7 +79,7 @@ class SaveUserAction
 
         if ($otherActiveSuperAdmins === 0) {
             throw ValidationException::withMessages([
-                'role' => 'At least one active Super Admin is required.',
+                'role' => 'At least one active Owner is required.',
             ]);
         }
     }

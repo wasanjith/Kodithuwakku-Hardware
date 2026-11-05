@@ -5,7 +5,7 @@ namespace App\Domain\HR\Policies;
 use App\Models\User;
 
 /**
- * Payroll, payslips, salary components and advances: Super Admin only (never delegated).
+ * Payroll, payslips, salary components and advances: Owner only (never delegated).
  */
 class PayrollPolicy
 {

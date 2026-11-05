@@ -20,8 +20,8 @@ beforeEach(function () {
     $this->stock = app(StockService::class);
 
     $this->urea = createUrea();
-    $this->seeds = createProduct(['name' => 'Chilli seeds', 'category' => 'Seeds', 'track_batches' => true, 'base_unit' => 'packet']);
-    $this->empty = createProduct(['name' => 'Onion seeds', 'category' => 'Seeds', 'base_unit' => 'packet', 'reference_cost' => '100']);
+    $this->seeds = createProduct(['name' => 'Chilli seeds', 'category' => 'Fasteners', 'track_batches' => true, 'base_unit' => 'packet']);
+    $this->empty = createProduct(['name' => 'Onion seeds', 'category' => 'Fasteners', 'base_unit' => 'packet', 'reference_cost' => '100']);
 
     $this->stock->receive($this->urea, null, '500', '170');
     $this->early = $this->stock->receive($this->seeds, null, '20', '250', ['lot_no' => 'A', 'expiry_date' => '2027-01-31']);
@@ -42,7 +42,7 @@ function startStocktake(array $categories = []): Stocktake
 }
 
 test('starting freezes one line per batch in scope, plus products without stock', function () {
-    $stocktake = startStocktake([Category::firstWhere('name', 'Seeds')->id]);
+    $stocktake = startStocktake([Category::firstWhere('name', 'Fasteners')->id]);
 
     $lines = $stocktake->lines()->orderBy('id')->get();
 
@@ -131,6 +131,6 @@ test('stocktake pages render and sales staff cannot use them', function () {
     $this->actingAs($this->manager)->get(route('inventory.stocktakes.sheet', $stocktake))->assertOk()->assertSee('Chilli seeds')->assertDontSee('500.000');
     $this->actingAs($this->manager)->get(route('inventory.stocktakes.show', [$stocktake, 'show' => 'all']))->assertOk();
 
-    $staff = userWithRole(Role::SalesStaff);
+    $staff = userWithRole(Role::Cashier);
     $this->actingAs($staff)->get(route('inventory.stocktakes.index'))->assertForbidden();
 });

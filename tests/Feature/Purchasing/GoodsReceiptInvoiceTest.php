@@ -16,7 +16,7 @@ beforeEach(function () {
     $this->seed([CatalogSeeder::class, DocumentSequenceSeeder::class]);
     $this->owner = userWithRole(Role::SuperAdmin);
     $this->manager = userWithRole(Role::Manager);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->supplier = Supplier::factory()->create(['name' => 'CIC Agri Businesses']);
     $this->urea = createUrea();
 });

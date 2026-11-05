@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="Kodithuwakku Hardware">
+  <defs>
+    <mask id="kh-jaw" maskUnits="userSpaceOnUse" x="-70" y="-70" width="140" height="140">
+      <rect x="-70" y="-70" width="140" height="140" fill="#fff"/>
+      <rect x="-6.5" y="-50" width="13" height="22" rx="2" fill="#000"/>
+    </mask>
+  </defs>
+  <circle cx="70" cy="70" r="64" fill="#3b0764"/>
+  <circle cx="70" cy="70" r="57" fill="#7e22ce" stroke="#fbbf24" stroke-width="6"/>
+  <g transform="translate(70 72)">
+    <!-- wrench -->
+    <g transform="rotate(-45)" fill="#fbbf24" mask="url(#kh-jaw)">
+      <circle cx="0" cy="-28" r="16"/>
+      <rect x="-6" y="-18" width="12" height="58" rx="6"/>
+    </g>
+    <!-- hammer -->
+    <g transform="rotate(45)" fill="#ffffff">
+      <rect x="-5.5" y="-22" width="11" height="62" rx="5"/>
+      <path d="M-24 -38 h36 q10 0 14 6 v10 h-50 q-4 0 -4 -4 v-8 q0 -4 4 -4 z"/>
+    </g>
+  </g>
+</svg>

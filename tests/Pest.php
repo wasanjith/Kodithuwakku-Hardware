@@ -183,7 +183,7 @@ function createUrea(array $attributes = []): Product
             'name' => 'Urea 50kg',
             'name_si' => 'යූරියා',
             'aliases' => 'yuriya, urea bag, u50',
-            'category' => 'Fertilizers',
+            'category' => 'Building Materials',
             'base_unit' => 'kg',
             'reference_cost' => '160',
             'min_selling_margin_pct' => '5',
@@ -215,7 +215,7 @@ function posSetup(): array
     $owner->setPin('1111');
     $manager = userWithRole(Role::Manager, ['name' => 'Manager']);
     $manager->setPin('2222');
-    $staff = userWithRole(Role::SalesStaff, ['name' => 'Nimal']);
+    $staff = userWithRole(Role::Cashier, ['name' => 'Nimal']);
     $staff->setPin('3331');
 
     [$main, $mainToken] = registeredTerminal(Terminal::factory()->mainCashier()->create());

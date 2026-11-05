@@ -25,7 +25,7 @@
                     name="role"
                     label="Role"
                     :options="collect($roles)->mapWithKeys(fn ($role) => [$role->value => $role->label()])->all()"
-                    :value="$user->primaryRole()?->value ?? \App\Domain\Identity\Enums\Role::SalesStaff->value"
+                    :value="$user->primaryRole()?->value ?? \App\Domain\Identity\Enums\Role::Cashier->value"
                     required
                 />
                 <x-ui.checkbox name="is_active" label="Active" :checked="$user->is_active" hint="Inactive users cannot sign in." class="sm:col-span-2" />

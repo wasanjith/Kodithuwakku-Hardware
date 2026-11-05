@@ -18,7 +18,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * A manual stock correction (damage, expiry, loss, found stock). Above the approval
- * limit it waits for the Super Admin before stock changes.
+ * limit it waits for the Owner before stock changes.
  *
  * @property int $id
  * @property string $number

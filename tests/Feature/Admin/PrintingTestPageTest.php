@@ -8,13 +8,13 @@ test('the sample thermal invoice renders Sinhala labels, product names, paid and
     $this->actingAs(userWithRole(Role::SuperAdmin))
         ->get(route('admin.printing-test.thermal', ['lang' => 'si']))
         ->assertOk()
-        ->assertSee('යූරියා පොහොර 50kg')
+        ->assertSee('සිමෙන්ති 50kg')
         ->assertSee('ගෙවිය යුතු මුදල')
         ->assertSee('ගෙවූ මුදල (මුදල්)')
         ->assertSee('ඉතිරිය')
-        ->assertSee('24,180.00')
-        ->assertSee('25,000.00')
-        ->assertSee('820.00');
+        ->assertSee('40,525.00')
+        ->assertSee('41,000.00')
+        ->assertSee('475.00');
 });
 
 test('the sample invoice can be printed in English or both languages', function () {
@@ -22,8 +22,8 @@ test('the sample invoice can be printed in English or both languages', function 
 
     $this->get(route('admin.printing-test.thermal', ['lang' => 'en']))
         ->assertOk()
-        ->assertSee('Urea Fertilizer 50kg')
-        ->assertDontSee('යූරියා පොහොර 50kg');
+        ->assertSee('Cement 50kg bag')
+        ->assertDontSee('සිමෙන්ති 50kg');
 
     $this->get(route('admin.printing-test.thermal', ['lang' => 'si+en']))
         ->assertOk()
@@ -43,8 +43,8 @@ test('auto-printing records the test time on the terminal printer', function () 
     expect($terminal->printer->fresh()->last_test_at)->not->toBeNull();
 });
 
-test('the printing test page is for the Super Admin only', function () {
-    $this->actingAs(userWithRole(Role::SalesStaff))
+test('the printing test page is for the Owner only', function () {
+    $this->actingAs(userWithRole(Role::Cashier))
         ->get(route('admin.printing-test'))
         ->assertForbidden();
 });

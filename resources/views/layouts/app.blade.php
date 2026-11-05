@@ -9,7 +9,7 @@
         <div class="fixed inset-0 bg-gray-900/60" @click="sidebarOpen = false"></div>
         <aside class="relative flex h-full w-64 flex-col bg-brand-900" x-trap.noscroll="sidebarOpen">
             <div class="flex h-24 shrink-0 items-center justify-between gap-3 px-4">
-                <img src="{{ asset('images/logo.png') }}" alt="Kodithuwakku Hardware" class="h-auto min-w-0 flex-1">
+                <img src="{{ asset('images/logo.svg') }}" alt="Kodithuwakku Hardware" class="h-auto min-w-0 flex-1">
                 <button type="button" class="text-2xl text-brand-100" @click="sidebarOpen = false" aria-label="Close menu">&times;</button>
             </div>
             @include('layouts.partials.sidebar')
@@ -20,7 +20,7 @@
     {{-- Desktop sidebar --}}
     <aside class="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-brand-900">
         <div class="flex h-24 shrink-0 items-center px-4">
-            <a href="{{ route('dashboard') }}" class="block w-full"><img src="{{ asset('images/logo.png') }}" alt="Kodithuwakku Hardware" class="h-auto w-full"></a>
+            <a href="{{ route('dashboard') }}" class="block w-full"><img src="{{ asset('images/logo.svg') }}" alt="Kodithuwakku Hardware" class="h-auto w-full"></a>
         </div>
         @include('layouts.partials.sidebar')
         @include('layouts.partials.sidebar-user')

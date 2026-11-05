@@ -14,7 +14,9 @@
         <x-ui.card title="Personal details">
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.input name="full_name" label="Full name" :value="$employee->full_name" required maxlength="150" />
-                <x-ui.input name="name_si" label="Name in Sinhala" :value="$employee->name_si" maxlength="150" class="font-sinhala" hint="Printed on the Sinhala payslip." />
+                @if (config('pos.sinhala_fields'))
+                    <x-ui.input name="name_si" label="Name in Sinhala" :value="$employee->name_si" maxlength="150" class="font-sinhala" hint="Printed on the Sinhala payslip." />
+                @endif
                 <x-ui.input name="nic" label="NIC" :value="$employee->nic" maxlength="20" />
                 <x-ui.date-input name="dob" label="Date of birth" :value="$employee->dob" />
                 <x-ui.input name="phone" label="Phone" :value="$employee->phone" maxlength="20" inputmode="tel" />

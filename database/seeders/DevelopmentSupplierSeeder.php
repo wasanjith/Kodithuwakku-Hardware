@@ -8,8 +8,8 @@ use App\Domain\Purchasing\Models\Supplier;
 use Illuminate\Database\Seeder;
 
 /**
- * The shop's seed suppliers, for local development (never run in production). Each one is
- * linked to the products of the brand it supplies (supplier_products), so a new purchase
+ * Demo hardware suppliers, for local development (never run in production). Each one is
+ * linked to the products of the brands it supplies (supplier_products), so a new purchase
  * order suggests only that supplier's products. Run after DevelopmentCatalogSeeder.
  */
 class DevelopmentSupplierSeeder extends Seeder
@@ -18,21 +18,20 @@ class DevelopmentSupplierSeeder extends Seeder
     {
         $suppliers = [
             // name => details, brands supplied
-            'Bathalagoda Agro' => [[
-                'contact_person' => 'Bathala Mama',
-                'phone' => '0776793706',
-                'email' => 'wasakodi79@gmail.com',
-                'address' => 'No: 164, New Housing Scheme, Jayawardhanapura',
+            'Lanka Building Supplies' => [[
+                'contact_person' => 'Mr. Perera',
+                'phone' => '0112345601',
+                'address' => 'No. 12, Main Street, Colombo 11',
                 'opening_balance' => '150000.00',
-            ], ['Bathalagoda Agro']],
-            'CIC' => [[
-                'contact_person' => 'Mr. Harshana',
-                'phone' => '0450547700',
-                'email' => 'wasanjith@crow.lk',
-                'address' => 'Grama 03, Muwangala roaad, Ampara',
+            ], ['Tokyo Super', 'Sanstha', 'Melwa', 'Lanka Roofing']],
+            'Pipe & Fittings Distributors' => [[
+                'contact_person' => 'Mr. Silva',
+                'phone' => '0112345602',
+                'address' => 'No. 45, Kandy Road, Kadawatha',
                 'opening_balance' => '120000.00',
-            ], ['CIC']],
-            'Ishara Lak Seeds' => [[], ['Ishara Lak Seeds']],
+            ], ['S-lon', 'Arpico', 'Rocell', 'Lanka Tiles']],
+            'Electrical Wholesale' => [[], ['Kelani', 'Orange', 'ABB']],
+            'Tools & Paints Agency' => [[], ['Dulux', 'Multilac', 'Harris', 'Stanley', 'Bosch', 'Makita', 'Pedrollo']],
         ];
 
         foreach ($suppliers as $name => [$details, $brands]) {

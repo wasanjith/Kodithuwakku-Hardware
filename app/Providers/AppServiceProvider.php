@@ -93,7 +93,7 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Super Admin passes every check. Anyone else may additionally hold a
+     * Owner passes every check. Anyone else may additionally hold a
      * permission through an active Cashier Handover delegation. Returning null
      * falls through to the normal role permissions (spatie/laravel-permission).
      */

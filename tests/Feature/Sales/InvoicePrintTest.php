@@ -26,12 +26,13 @@ beforeEach(function () {
 });
 
 test('the 80 mm invoice prints in Sinhala with totals, paid and balance', function () {
-    app(Settings::class)->setGroup('shop', ['name_si' => 'සිටිසන්ස් ඇග්‍රෝ']);
+    app(Settings::class)->setGroup('receipt', ['language' => 'si']);
+    app(Settings::class)->setGroup('shop', ['name_si' => 'කොඩිතුවක්කු හාඩ්වෙයාර්']);
 
     atTerminal($this->pos['counterToken'], $this->pos['staff'])
         ->get(route('pos.sales.invoice', ['sale' => $this->sale, 'job' => $this->job->id]))
         ->assertOk()
-        ->assertSee('සිටිසන්ස් ඇග්‍රෝ')
+        ->assertSee('කොඩිතුවක්කු හාඩ්වෙයාර්')
         ->assertSee($this->sale->invoice_no)
         ->assertSee('යූරියා')                 // product name_si
         ->assertSee('ගෙවිය යුතු මුදල')          // total
@@ -59,8 +60,8 @@ test('a reprint is marked COPY and a printed job does not print again', function
 
     atTerminal($this->pos['counterToken'], $this->pos['staff'])
         ->get(route('pos.sales.invoice', ['sale' => $this->sale, 'job' => $copy->id]))
-        ->assertSee('පිටපත')
-        ->assertSee('COPY');
+        ->assertSee('COPY')
+        ->assertDontSee('පිටපත');
 
     atTerminal($this->pos['counterToken'], $this->pos['staff'])
         ->postJson(route('api.pos.print-jobs.printed', $this->job))
@@ -75,7 +76,7 @@ test('a reprint is marked COPY and a printed job does not print again', function
 
 test('another counter\'s staff cannot open the invoice', function () {
     [$counter2, $token2] = registeredTerminal(Terminal::factory()->counter(2)->create());
-    $other = userWithRole(Role::SalesStaff);
+    $other = userWithRole(Role::Cashier);
 
     atTerminal($token2, $other)->get(route('pos.sales.invoice', $this->sale))->assertForbidden();
 });

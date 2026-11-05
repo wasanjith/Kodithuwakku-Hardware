@@ -21,7 +21,7 @@ test('each role holds exactly the permissions of the catalogue', function (Role 
 })->with(Role::cases());
 
 test('key business rules of the permission matrix', function () {
-    $staff = userWithRole(Role::SalesStaff);
+    $staff = userWithRole(Role::Cashier);
     $manager = userWithRole(Role::Manager);
 
     // Counter staff bill, reprint and create purchase orders, but never settle, see cost or approve.
@@ -40,7 +40,7 @@ test('key business rules of the permission matrix', function () {
         ->and($manager->can('finance.banks.manage'))->toBeFalse();
 });
 
-test('the Super Admin passes every check, including unknown abilities', function () {
+test('the Owner passes every check, including unknown abilities', function () {
     $owner = userWithRole(Role::SuperAdmin);
 
     expect($owner->can('pos.settle'))->toBeTrue()

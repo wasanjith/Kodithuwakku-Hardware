@@ -17,7 +17,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * Product category. Categories form a tree (Bicycle Parts → Tyres) and may own a short code range.
+ * Product category. Categories form a tree (Plumbing → PVC Pipes) and may own a short code range.
  *
  * @property int $id
  * @property int|null $parent_id
@@ -115,7 +115,7 @@ class Category extends Model
     }
 
     /**
-     * "Bicycle Parts › Tyres".
+     * "Plumbing › PVC Pipes".
      */
     public function path(): string
     {

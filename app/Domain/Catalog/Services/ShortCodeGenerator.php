@@ -7,14 +7,14 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Suggests the next free numeric short code, inside the category's range when it has one
- * (Fertilizers 1000-1999, Bicycle Parts 5000-6999 …). Codes stay editable on the form.
+ * (Building Materials 10000-14999, Plumbing 20000-24999 …). Codes stay editable on the form.
  */
 class ShortCodeGenerator
 {
     /**
      * Codes above this are used when a category has no range of its own.
      */
-    private const DEFAULT_FROM = 10000;
+    private const DEFAULT_FROM = 100000;
 
     /**
      * @param  list<string>  $reserved  codes already taken in the current batch (e.g. an import being built)

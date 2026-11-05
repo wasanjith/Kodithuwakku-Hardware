@@ -17,7 +17,7 @@ beforeEach(function () {
     app(Settings::class)->setGroup('inventory', ['adjustment_approval_limit' => 10000]);
     $this->owner = userWithRole(Role::SuperAdmin);
     $this->manager = userWithRole(Role::Manager);
-    $this->staff = userWithRole(Role::SalesStaff);
+    $this->staff = userWithRole(Role::Cashier);
     $this->urea = createUrea();
     $this->stock = app(StockService::class);
     $this->batch = $this->stock->receive($this->urea, null, '500', '170');

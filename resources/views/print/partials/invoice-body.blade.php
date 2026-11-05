@@ -28,13 +28,13 @@
     <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('sample') }}</span></div>
 @endif
 @if (! empty($invoice['is_copy']))
-    <div class="center" style="margin-top: 2mm"><span class="badge">{{ __('receipt.copy', [], 'si') }} / {{ __('receipt.copy', [], 'en') }}</span></div>
+    <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('copy') }}</span></div>
 @endif
 @if (! empty($invoice['is_void']))
     <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('void') }}</span></div>
 @endif
 @if (! empty($invoice['is_credit']))
-    <div class="center" style="margin-top: 2mm"><span class="badge">{{ __('receipt.credit_invoice', [], 'si') }} / {{ __('receipt.credit_invoice', [], 'en') }}</span></div>
+    <div class="center" style="margin-top: 2mm"><span class="badge">{{ $t('credit_invoice') }}</span></div>
 @endif
 
 <hr class="rule">

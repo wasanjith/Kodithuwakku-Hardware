@@ -16,7 +16,9 @@
         <x-ui.card>
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.input name="name" label="Name" :value="$customer->name" required />
-                <x-ui.input name="name_si" label="Name in Sinhala" :value="$customer->name_si" class="font-sinhala" hint="Printed on Sinhala invoices and statements." />
+                @if (config('pos.sinhala_fields'))
+                    <x-ui.input name="name_si" label="Name in Sinhala" :value="$customer->name_si" class="font-sinhala" hint="Printed on Sinhala invoices and statements." />
+                @endif
                 <x-ui.input name="phone" label="Phone" :value="$customer->phone" inputmode="tel" hint="Counter staff find customers by phone." />
                 <x-ui.input name="nic" label="NIC" :value="$customer->nic" hint="881234567V or 198812345678. Optional." />
                 <x-ui.input name="area" label="Village / area" :value="$customer->area" />

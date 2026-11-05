@@ -11,8 +11,8 @@ use App\Domain\Catalog\Services\ProductSearchService;
 beforeEach(function () {
     config(['scout.driver' => 'null']);
     createUrea();
-    createProduct(['short_code' => '1002', 'name' => 'Triple Super Phosphate (TSP) 50kg', 'name_si' => 'ටී.එස්.පී.', 'aliases' => 'tsp', 'category' => 'Fertilizers']);
-    createProduct(['short_code' => '4001', 'name' => 'Mammoty', 'name_si' => 'උදැල්ල', 'aliases' => 'udalla, hoe', 'category' => 'Tools']);
+    createProduct(['short_code' => '1002', 'name' => 'Triple Super Phosphate (TSP) 50kg', 'name_si' => 'ටී.එස්.පී.', 'aliases' => 'tsp', 'category' => 'Building Materials']);
+    createProduct(['short_code' => '4001', 'name' => 'Mammoty', 'name_si' => 'උදැල්ල', 'aliases' => 'udalla, hoe', 'category' => 'Hand Tools']);
     $this->search = app(ProductSearchService::class);
 });
 
@@ -32,7 +32,7 @@ test('the fallback finds products by name, Sinhala name, alias and typo', functi
 
 test('the fallback finds a product by brand, and brand + name puts that brand first', function () {
     $baur = Brand::create(['name' => 'Baur']);
-    createProduct(['short_code' => '1005', 'name' => 'Urea 50kg', 'brand_id' => $baur->id, 'category' => 'Fertilizers']);
+    createProduct(['short_code' => '1005', 'name' => 'Urea 50kg', 'brand_id' => $baur->id, 'category' => 'Building Materials']);
 
     expect($this->search->search('baur')['items'][0]['short_code'] ?? null)->toBe('1005')
         ->and($this->search->search('baur urea')['items'][0]['short_code'] ?? null)->toBe('1005')

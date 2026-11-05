@@ -54,7 +54,7 @@ test('the manager manages the catalogue but not taxes', function () {
 });
 
 test('sales staff only see the product list', function () {
-    $staff = userWithRole(Role::SalesStaff);
+    $staff = userWithRole(Role::Cashier);
 
     $this->actingAs($staff)->get(route('catalog.products.index'))->assertOk();
 
@@ -64,28 +64,28 @@ test('sales staff only see the product list', function () {
 });
 
 test('categories form a tree and a range may not overlap another', function () {
-    $bicycle = Category::firstWhere('name', 'Bicycle Parts');
+    $bicycle = Category::firstWhere('name', 'Plumbing');
 
     $this->actingAs($this->owner)->post(route('catalog.categories.store'), [
         'name' => 'Pedals', 'parent_id' => $bicycle->id, 'sort_order' => 9, 'is_active' => '1',
     ])->assertSessionHasNoErrors();
 
     $pedals = Category::firstWhere('name', 'Pedals');
-    expect($pedals->path())->toBe('Bicycle Parts › Pedals')
-        ->and($pedals->codeRange())->toBe([5000, 6999]);
+    expect($pedals->path())->toBe('Plumbing › Pedals')
+        ->and($pedals->codeRange())->toBe([20000, 24999]);
 
     $this->actingAs($this->owner)->post(route('catalog.categories.store'), [
-        'name' => 'Irrigation', 'code_from' => 1500, 'code_to' => 2500, 'sort_order' => 0, 'is_active' => '1',
+        'name' => 'Irrigation', 'code_from' => 12000, 'code_to' => 21000, 'sort_order' => 0, 'is_active' => '1',
     ])->assertSessionHasErrors('code_from');
 
     $this->actingAs($this->owner)->put(route('catalog.categories.update', $bicycle), [
-        'name' => 'Bicycle Parts', 'parent_id' => $pedals->id, 'sort_order' => 0, 'is_active' => '1',
+        'name' => 'Plumbing', 'parent_id' => $pedals->id, 'sort_order' => 0, 'is_active' => '1',
     ])->assertSessionHasErrors('parent_id');
 });
 
 test('a category with products cannot be deleted', function () {
-    createProduct(['category' => 'Tools']);
-    $tools = Category::firstWhere('name', 'Tools');
+    createProduct(['category' => 'Hand Tools']);
+    $tools = Category::firstWhere('name', 'Hand Tools');
 
     $this->actingAs($this->owner)->delete(route('catalog.categories.destroy', $tools))->assertSessionHas('error');
 

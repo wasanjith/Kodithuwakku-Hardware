@@ -16,7 +16,7 @@ beforeEach(function () {
     $this->kg = Unit::firstWhere('name', 'kg');
     $this->bag = Unit::firstWhere('name', 'bag');
     $this->retail = PriceList::firstWhere('name', 'Retail');
-    $this->fertilizers = Category::firstWhere('name', 'Fertilizers');
+    $this->fertilizers = Category::firstWhere('name', 'Building Materials');
 });
 
 function productPayload(array $overrides = []): array
@@ -111,7 +111,7 @@ test('a price below cost plus the minimum margin is refused', function () {
 });
 
 test('short codes are unique across products and variants', function () {
-    createProduct(['short_code' => '5001', 'category' => 'Tyres'], variants: [
+    createProduct(['short_code' => '5001', 'category' => 'PVC Pipes'], variants: [
         ['short_code' => '5002', 'name' => '26"', 'is_active' => true],
     ]);
 
@@ -151,62 +151,62 @@ test('variants are saved, and removed variants are soft deleted', function () {
 });
 
 test('the next short code follows the category range, also for sub-categories', function () {
-    $tyres = Category::firstWhere('name', 'Tyres');
-    createProduct(['short_code' => '5000', 'category' => 'Tyres']);
-    createProduct(['short_code' => '5001', 'category' => 'Tyres']);
+    $pipes = Category::firstWhere('name', 'PVC Pipes');
+    createProduct(['short_code' => '20000', 'category' => 'PVC Pipes']);
+    createProduct(['short_code' => '20001', 'category' => 'PVC Pipes']);
 
     $this->actingAs($this->owner)
-        ->getJson(route('catalog.products.next-code', ['category_id' => $tyres->id]))
+        ->getJson(route('catalog.products.next-code', ['category_id' => $pipes->id]))
         ->assertOk()
-        ->assertJson(['code' => '5002', 'range' => [5000, 6999]]);
+        ->assertJson(['code' => '20002', 'range' => [20000, 24999]]);
 
     $this->actingAs($this->owner)
         ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id]))
-        ->assertJson(['code' => '1000']);
+        ->assertJson(['code' => '10000']);
 });
 
 test('the next sku follows the category and brand, also counting deleted products', function () {
     $brand = Brand::factory()->create(['name' => 'Bathalagoda Agro']);
-    createProduct(['sku' => 'FER-BAT-001', 'category' => 'Fertilizers', 'brand_id' => $brand->id]);
-    createProduct(['sku' => 'FER-BAT-002', 'category' => 'Fertilizers', 'brand_id' => $brand->id])->delete();
-    createProduct(['sku' => 'FER-BAT-SPECIAL', 'category' => 'Fertilizers']);
+    createProduct(['sku' => 'BUI-BAT-001', 'category' => 'Building Materials', 'brand_id' => $brand->id]);
+    createProduct(['sku' => 'BUI-BAT-002', 'category' => 'Building Materials', 'brand_id' => $brand->id])->delete();
+    createProduct(['sku' => 'BUI-BAT-SPECIAL', 'category' => 'Building Materials']);
 
     $this->actingAs($this->owner)
         ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id, 'brand_id' => $brand->id]))
         ->assertOk()
-        ->assertJson(['code' => '1000', 'sku' => 'FER-BAT-003']);
+        ->assertJson(['code' => '10000', 'sku' => 'BUI-BAT-003']);
 
     $this->actingAs($this->owner)
         ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id]))
-        ->assertJson(['sku' => 'FER-001']);
+        ->assertJson(['sku' => 'BUI-001']);
 
     $this->actingAs($this->owner)
-        ->getJson(route('catalog.products.next-code', ['category_id' => Category::firstWhere('name', 'Agro-chemicals')->id, 'brand_id' => $brand->id]))
-        ->assertJson(['sku' => 'AGR-BAT-001']);
+        ->getJson(route('catalog.products.next-code', ['category_id' => Category::firstWhere('name', 'Paints')->id, 'brand_id' => $brand->id]))
+        ->assertJson(['sku' => 'PAI-BAT-001']);
 });
 
 test('the add product form pre-fills short code and sku when a category is given', function () {
     $this->actingAs($this->owner)
         ->get(route('catalog.products.create', ['category_id' => $this->fertilizers->id]))
         ->assertOk()
-        ->assertSee('1000')
-        ->assertSee('FER-001');
+        ->assertSee('10000')
+        ->assertSee('BUI-001');
 });
 
 test('deleted products keep their code reserved', function () {
-    $product = createProduct(['short_code' => '1000', 'category' => 'Fertilizers']);
+    $product = createProduct(['short_code' => '10000', 'category' => 'Building Materials']);
 
     $this->actingAs($this->owner)->delete(route('catalog.products.destroy', $product))->assertRedirect(route('catalog.products.index'));
 
     expect($product->fresh()->trashed())->toBeTrue();
     $this->actingAs($this->owner)
         ->getJson(route('catalog.products.next-code', ['category_id' => $this->fertilizers->id]))
-        ->assertJson(['code' => '1001']);
+        ->assertJson(['code' => '10001']);
 });
 
 test('sales staff can look at products but not change them or see cost', function () {
     $product = createUrea();
-    $staff = userWithRole(Role::SalesStaff);
+    $staff = userWithRole(Role::Cashier);
 
     $this->actingAs($staff)->get(route('catalog.products.index'))->assertOk()->assertSee('Urea 50kg');
     $this->actingAs($staff)->get(route('catalog.products.show', $product))
@@ -225,7 +225,7 @@ test('the product export leaves out cost for sales staff', function () {
     createUrea();
 
     $this->actingAs(userWithRole(Role::Manager))->get(route('catalog.products.export'))->assertOk()->assertDownload();
-    $this->actingAs(userWithRole(Role::SalesStaff))->get(route('catalog.products.export'))->assertOk()->assertDownload();
+    $this->actingAs(userWithRole(Role::Cashier))->get(route('catalog.products.export'))->assertOk()->assertDownload();
 
     $query = Product::query();
     expect((new ProductsExport($query, withCost: false))->headings())->not->toContain('Cost')
@@ -233,10 +233,10 @@ test('the product export leaves out cost for sales staff', function () {
 });
 
 test('the product list filters by category including sub-categories', function () {
-    createProduct(['name' => 'Tyre 26', 'category' => 'Tyres']);
-    createProduct(['name' => 'Mammoty', 'category' => 'Tools']);
+    createProduct(['name' => 'Tyre 26', 'category' => 'PVC Pipes']);
+    createProduct(['name' => 'Mammoty', 'category' => 'Hand Tools']);
 
-    $bicycle = Category::firstWhere('name', 'Bicycle Parts');
+    $bicycle = Category::firstWhere('name', 'Plumbing');
 
     $this->actingAs($this->owner)
         ->get(route('catalog.products.index', ['filter' => ['category' => $bicycle->id]]))

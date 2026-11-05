@@ -624,7 +624,7 @@ class ProductImporter
     }
 
     /**
-     * "Tyres" or "Bicycle Parts > Tyres" (also › or /).
+     * "PVC Pipes" or "Plumbing > PVC Pipes" (also › or /).
      */
     private function findCategory(string $name): ?Category
     {
