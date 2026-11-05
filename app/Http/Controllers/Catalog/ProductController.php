@@ -1,0 +1,257 @@
+<?php
+
+namespace App\Http\Controllers\Catalog;
+
+use App\Domain\Catalog\Actions\SaveProductAction;
+use App\Domain\Catalog\Models\Brand;
+use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Catalog\Models\Product;
+use App\Domain\Catalog\Models\ProductUnit;
+use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Catalog\Models\Tax;
+use App\Domain\Catalog\Models\Unit;
+use App\Domain\Catalog\Services\PriceBook;
+use App\Domain\Catalog\Services\ShortCodeGenerator;
+use App\Domain\Catalog\Services\SkuGenerator;
+use App\Domain\Inventory\Models\StockLevel;
+use App\Domain\Inventory\Models\StockMovement;
+use App\Domain\Inventory\Services\StockAlerts;
+use App\Domain\Inventory\Support\Qty;
+use App\Http\Controllers\Concerns\HasListQuery;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Catalog\SaveProductRequest;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Spatie\Activitylog\Models\Activity;
+
+class ProductController extends Controller
+{
+    use HasListQuery;
+
+    public function index(Request $request, PriceBook $priceBook): View
+    {
+        $this->authorize('viewAny', Product::class);
+
+        $products = $this->applyListQuery(
+            Product::query()->with(['category', 'brand', 'baseUnit', 'units.unit'])->addSelect(['on_hand' => StockAlerts::onHandSubquery()]),
+            $request,
+            searchable: ['short_code', 'name', 'name_si', 'aliases', 'sku', 'brand.name'],
+            sortable: ['short_code', 'name', 'created_at', 'updated_at'],
+            filters: self::listFilters(),
+            defaultSort: 'short_code',
+            defaultDirection: 'asc',
+        )->paginate(25)->withQueryString();
+
+        $retail = PriceList::default();
+
+        return view('catalog.products.index', [
+            'products' => $products,
+            'prices' => $retail ? $priceBook->forProducts($products->pluck('id')->all(), $retail->id) : [],
+            'priceList' => $retail,
+            'categories' => CategoryController::options(),
+            'brands' => Brand::query()->orderBy('name')->pluck('name', 'id'),
+        ]);
+    }
+
+    /**
+     * Filters shared by the list page and the Excel export.
+     *
+     * @return array<string, callable(Builder<Product>, string): void>
+     */
+    public static function listFilters(): array
+    {
+        return [
+            'category' => function (Builder $query, string $categoryId): void {
+                $category = Category::find($categoryId);
+                $query->whereIn('category_id', $category?->descendantIdsAndSelf() ?? [0]);
+            },
+            'brand' => function (Builder $query, string $brandId): void {
+                $query->where('brand_id', $brandId);
+            },
+            'status' => function (Builder $query, string $status): void {
+                $query->where('is_active', $status === 'active');
+            },
+            'low' => function (Builder $query, string $value): void {
+                if ($value === '1') {
+                    app(StockAlerts::class)->whereLowStock($query);
+                }
+            },
+            // Products the counter cannot bill: no current price on the default (Retail) list.
+            'no_price' => function (Builder $query, string $value): void {
+                if ($value === '1') {
+                    app(PriceBook::class)->whereWithoutPrice($query, (int) PriceList::default()?->id);
+                }
+            },
+        ];
+    }
+
+    public function show(Product $product, PriceBook $priceBook): View
+    {
+        $this->authorize('view', $product);
+
+        $product->load(['category.parent.parent', 'brand', 'baseUnit', 'tax', 'units.unit', 'creator', 'opensInto.baseUnit', 'variants' => fn ($query) => $query->withTrashed()]);
+
+        return view('catalog.products.show', [
+            'product' => $product,
+            'priceLists' => PriceList::query()->orderBy('id')->get(),
+            'prices' => $priceBook->tiersForProduct($product->id),
+            'priceHistory' => $product->prices()->with(['unit', 'priceList', 'creator'])->latest('effective_from')->latest('id')->limit(50)->get(),
+            'openingStock' => $product->openingStock()->whereNull('posted_at')->get(),
+            'stockLevels' => StockLevel::query()
+                ->with(['batch', 'variant'])
+                ->where('product_id', $product->id)
+                ->where(fn (Builder $query) => $query->where('qty_on_hand', '!=', 0)->orWhere('qty_reserved', '!=', 0))
+                ->get()
+                ->sortBy(fn (StockLevel $level) => [$level->variant_id ?? 0, $level->batch->expiry_date->timestamp ?? PHP_INT_MAX, $level->batch_id])
+                ->values(),
+            'movements' => StockMovement::query()
+                ->with(['variant', 'batch', 'user', 'reference'])
+                ->where('product_id', $product->id)
+                ->latest('id')
+                ->limit(15)
+                ->get(),
+            'activity' => Activity::query()
+                ->where('subject_type', $product->getMorphClass())
+                ->where('subject_id', $product->id)
+                ->with('causer')
+                ->latest('id')
+                ->limit(20)
+                ->get(),
+        ]);
+    }
+
+    public function create(Request $request, ShortCodeGenerator $codes, SkuGenerator $skus): View
+    {
+        $this->authorize('create', Product::class);
+
+        $category = $request->integer('category_id') ? Category::find($request->integer('category_id')) : null;
+
+        $product = new Product([
+            'is_active' => true,
+            'category_id' => $category?->id,
+            'short_code' => $category ? $codes->next($category) : null,
+            'sku' => $category ? $skus->next($category) : null,
+            'reorder_level' => 0,
+            'reorder_qty' => 0,
+        ]);
+
+        return view('catalog.products.form', $this->formData($product, []));
+    }
+
+    public function store(SaveProductRequest $request, SaveProductAction $saveProduct): RedirectResponse
+    {
+        $product = $saveProduct->handle($request->productData(), $request->user());
+
+        return redirect()->route('catalog.products.show', $product)->with('success', "Product {$product->short_code} · {$product->name} created.");
+    }
+
+    public function edit(Product $product, PriceBook $priceBook): View
+    {
+        $this->authorize('update', $product);
+
+        $product->load(['units', 'variants']);
+
+        return view('catalog.products.form', $this->formData($product, $priceBook->tiersForProduct($product->id)));
+    }
+
+    public function update(SaveProductRequest $request, Product $product, SaveProductAction $saveProduct): RedirectResponse
+    {
+        $saveProduct->handle($request->productData(), $request->user(), $product);
+
+        return redirect()->route('catalog.products.show', $product)->with('success', "Product {$product->short_code} · {$product->name} updated.");
+    }
+
+    /**
+     * Soft delete. Old invoices keep pointing at the product and its short code is never reused.
+     */
+    public function destroy(Product $product): RedirectResponse
+    {
+        $this->authorize('delete', $product);
+
+        $product->delete();
+
+        return redirect()->route('catalog.products.index')->with('success', "Product {$product->short_code} · {$product->name} deleted.");
+    }
+
+    /**
+     * Suggest the next free short code for a category, and the next SKU for the category + brand (used by the product form).
+     */
+    public function nextCode(Request $request, ShortCodeGenerator $codes, SkuGenerator $skus): JsonResponse
+    {
+        $this->authorize('create', Product::class);
+
+        $category = Category::find($request->integer('category_id'));
+        $brand = Brand::find($request->integer('brand_id'));
+
+        return response()->json([
+            'code' => $codes->next($category),
+            'range' => $category?->codeRange(),
+            'sku' => $category ? $skus->next($category, $brand) : null,
+        ]);
+    }
+
+    /**
+     * @param  array<int, array<int, array<string, string>>>  $prices  price_list_id => [unit_id => [min_qty => price]]
+     * @return array<string, mixed>
+     */
+    private function formData(Product $product, array $prices): array
+    {
+        $units = Unit::query()->orderBy('name')->get();
+
+        $unitRows = $product->exists
+            ? $product->units->map(fn (ProductUnit $unit) => [
+                'unit_id' => $unit->unit_id,
+                'factor' => $unit->factor,
+                'is_default_sale' => $unit->is_default_sale,
+                'is_default_purchase' => $unit->is_default_purchase,
+            ])->values()->all()
+            : [];
+
+        $variantRows = $product->exists
+            ? $product->variants->map(fn (ProductVariant $variant) => [
+                'id' => $variant->id,
+                'short_code' => $variant->short_code,
+                'name' => $variant->name,
+                'sku' => $variant->sku,
+                'size' => $variant->attributes['size'] ?? '',
+                'colour' => $variant->attributes['colour'] ?? '',
+                'is_active' => $variant->is_active,
+            ])->values()->all()
+            : [];
+
+        $attributeRows = collect($product->attributes ?? [])
+            ->map(fn ($value, $key) => ['key' => $key, 'value' => $value])
+            ->values()
+            ->all();
+
+        return [
+            'product' => $product,
+            'categories' => CategoryController::options(activeOnly: true),
+            'brands' => Brand::query()->active()->orderBy('name')->pluck('name', 'id'),
+            'units' => $units,
+            'taxes' => Tax::query()->orderBy('name')->get()->mapWithKeys(fn (Tax $tax) => [$tax->id => $tax->label()]),
+            'looseProducts' => Product::query()->where('sold_loose', true)->whereKeyNot($product->id ?? 0)->orderBy('name')->pluck('name', 'id'),
+            'priceLists' => PriceList::query()->orderBy('id')->get(),
+            'unitRows' => old('units', $unitRows),
+            'variantRows' => old('variants', $variantRows),
+            'attributeRows' => old('attribute_rows', $attributeRows),
+            // "list:unit" = any-quantity price, "list:unit@1" = price from 1 base unit (loose goods).
+            'priceMatrix' => old('prices') ? collect(old('prices'))->mapWithKeys(fn ($row) => [self::priceKey($row['price_list_id'], $row['unit_id'], $row['min_qty'] ?? '0') => $row['price']])->all()
+                : collect($prices)->flatMap(fn ($byUnit, $listId) => collect($byUnit)->flatMap(fn ($tiers, $unitId) => collect($tiers)->mapWithKeys(fn ($price, $minQty) => [self::priceKey($listId, $unitId, (string) $minQty) => $price])))->all(),
+        ];
+    }
+
+    /**
+     * Key of one price box on the product form.
+     */
+    private static function priceKey(int|string $listId, int|string $unitId, string $minQty): string
+    {
+        $tier = Qty::format($minQty === '' ? '0' : $minQty);
+
+        return $tier === '0' ? "{$listId}:{$unitId}" : "{$listId}:{$unitId}@{$tier}";
+    }
+}

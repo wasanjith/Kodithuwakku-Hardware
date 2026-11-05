@@ -1,0 +1,487 @@
+<?php
+
+namespace App\Domain\Catalog\Services;
+
+use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Catalog\Models\Product;
+use App\Domain\Catalog\Models\ProductUnit;
+use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Inventory\Services\StockService;
+use App\Domain\Inventory\Support\Qty;
+use App\Models\User;
+use Brick\Math\RoundingMode;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+/**
+ * Product search for the POS and the back office.
+ *
+ *   1. "5*urea" → qty 5, term "urea"; "750g*urea" → qty 0.75 (grams of a kg product).
+ *   2. An exact short code (product or variant) returns just that item.
+ *   3. Otherwise Meilisearch; if it is down, MySQL FULLTEXT (ngram) + LIKE on short codes.
+ *   4. Hits are hydrated from MySQL with live prices and live stock (on hand − reserved).
+ *   5. Cost fields are only included for users with catalog.cost.view.
+ *   6. The brands of the hits come back as suggestions, so the same item from several
+ *      companies can be narrowed to one (brand_id filter). "lanka urea" also works.
+ *   7. supplier_id keeps only the products that supplier supplies (supplier_products, the
+ *      purchase order form). It searches MySQL, and with no term it lists them all.
+ */
+class ProductSearchService
+{
+    public const ENGINE_CODE = 'code';
+
+    public const ENGINE_MEILISEARCH = 'meilisearch';
+
+    public const ENGINE_MYSQL = 'mysql';
+
+    public function __construct(
+        private readonly PriceBook $priceBook,
+        private readonly StockService $stock,
+    ) {}
+
+    /**
+     * @param  array{category_id?: int|null, brand_id?: int|null, supplier_id?: int|null, include_inactive?: bool}  $filters
+     * @return array{term: string, qty: string|null, engine: string, items: list<array<string, mixed>>, brands: list<array{id: int, name: string, count: int}>}
+     */
+    public function search(string $query, array $filters = [], int $limit = 20, ?User $user = null, ?int $priceListId = null): array
+    {
+        [$qty, $term] = self::parseQuantity($query);
+
+        $priceListId ??= PriceList::default()?->id;
+
+        if ($term === '') {
+            if (empty($filters['supplier_id'])) {
+                return ['term' => '', 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => [], 'brands' => []];
+            }
+
+            $items = $this->hydrate($this->supplierProductIds($filters, $limit), $priceListId, $user);
+
+            return ['term' => '', 'qty' => $qty, 'engine' => self::ENGINE_MYSQL, 'items' => $items, 'brands' => self::brandsOf($items)];
+        }
+
+        $includeInactive = (bool) ($filters['include_inactive'] ?? false);
+
+        $exact = $this->exactCode($term, $includeInactive, isset($filters['supplier_id']) ? (int) $filters['supplier_id'] : null);
+
+        if ($exact !== null) {
+            $items = $this->hydrate($exact[0], $priceListId, $user, onlyVariantId: $exact[1]);
+
+            return ['term' => $term, 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => $items, 'brands' => self::brandsOf($items)];
+        }
+
+        [$ids, $engine] = $this->findIds($term, $filters, $limit);
+        $items = array_slice($this->hydrate($ids, $priceListId, $user, $term), 0, $limit);
+
+        return ['term' => $term, 'qty' => $qty, 'engine' => $engine, 'items' => $items, 'brands' => self::brandsOf($items)];
+    }
+
+    /**
+     * Brands among the result items, most items first: the chips that narrow
+     * "urea" down to one company's urea.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array{id: int, name: string, count: int}>
+     */
+    public static function brandsOf(array $items): array
+    {
+        return collect($items)
+            ->filter(fn (array $item) => $item['brand_id'] !== null)
+            ->groupBy('brand_id')
+            ->map(fn (Collection $group) => ['id' => (int) $group->first()['brand_id'], 'name' => (string) $group->first()['brand'], 'count' => $group->count()])
+            ->sortBy([['count', 'desc'], ['name', 'asc']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Result items for known products, in the given order (POS favourites, recent, categories).
+     *
+     * @param  list<int>  $ids
+     * @return list<array<string, mixed>>
+     */
+    public function items(array $ids, ?User $user = null, ?int $priceListId = null): array
+    {
+        return $this->hydrate($ids, $priceListId ?? PriceList::default()?->id, $user);
+    }
+
+    /**
+     * "5*urea" → ['5', 'urea'], "2.5 * tsp" → ['2.5', 'tsp'], "urea" → [null, 'urea'].
+     *
+     * @return array{0: string|null, 1: string}
+     */
+    public static function parseQuantity(string $query): array
+    {
+        $query = trim($query);
+
+        if (preg_match('/^(\d+(?:\.\d{1,3})?)\s*\*\s*(.*)$/u', $query, $matches) === 1 && (float) $matches[1] > 0) {
+            return [$matches[1], trim($matches[2])];
+        }
+
+        // Grams of a loose product: "750g*urea" → 0.75 (kg).
+        if (preg_match('/^(\d+(?:\.\d+)?)\s*(g|gm|kg)\s*\*\s*(.*)$/iu', $query, $matches) === 1 && (float) $matches[1] > 0) {
+            $qty = mb_strtolower($matches[2]) === 'kg' ? Qty::of($matches[1]) : Qty::of($matches[1])->dividedBy(1000, Qty::SCALE, RoundingMode::HalfUp);
+
+            return $qty->isPositive() ? [Qty::format($qty), trim($matches[3])] : [null, $query];
+        }
+
+        return [null, $query];
+    }
+
+    /**
+     * @return array{0: list<int>, 1: int|null}|null product ids and the matched variant id
+     */
+    private function exactCode(string $term, bool $includeInactive, ?int $supplierId = null): ?array
+    {
+        $code = mb_strtoupper($term);
+
+        $product = Product::query()
+            ->when(! $includeInactive, fn (Builder $query) => $query->active())
+            ->when($supplierId, fn (Builder $query) => self::suppliedBy($query, $supplierId))
+            ->where('short_code', $code)
+            ->first();
+
+        if ($product !== null) {
+            return [[$product->id], null];
+        }
+
+        $variant = ProductVariant::query()
+            ->where('short_code', $code)
+            ->when(! $includeInactive, fn (Builder $query) => $query->where('is_active', true)
+                ->whereHas('product', fn (Builder $product) => $product->active()))
+            ->when($supplierId, fn (Builder $query) => $query->whereHas('product', fn (Builder $product) => self::suppliedBy($product, $supplierId)))
+            ->first();
+
+        return $variant === null ? null : [[$variant->product_id], $variant->id];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{0: list<int>, 1: string}
+     */
+    private function findIds(string $term, array $filters, int $limit): array
+    {
+        // The search index does not know who supplies what.
+        if (config('scout.driver') === 'meilisearch' && empty($filters['supplier_id'])) {
+            try {
+                return [$this->meilisearch($term, $filters, $limit), self::ENGINE_MEILISEARCH];
+            } catch (Throwable $exception) {
+                Log::warning('Meilisearch unavailable, using MySQL search.', ['error' => $exception->getMessage()]);
+            }
+        }
+
+        return [$this->mysql($term, $filters, $limit), self::ENGINE_MYSQL];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return list<int>
+     */
+    private function meilisearch(string $term, array $filters, int $limit): array
+    {
+        $search = Product::search($term)->take($limit);
+
+        if (! ($filters['include_inactive'] ?? false)) {
+            $search->where('is_active', true);
+        }
+        if (! empty($filters['category_id'])) {
+            $search->where('category_ids', (int) $filters['category_id']);
+        }
+        if (! empty($filters['brand_id'])) {
+            $search->where('brand_id', (int) $filters['brand_id']);
+        }
+
+        return $search->keys()->map(fn ($id) => (int) $id)->values()->all();
+    }
+
+    /**
+     * Fallback: FULLTEXT with the ngram parser (handles Sinhala and partial words) plus
+     * LIKE on product and variant codes and names and the brand name. Products that have
+     * every word in their name, alias, code, variant name or brand come first, so "baur"
+     * and "lanka urea" are not outranked by ngram near-misses.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<int>
+     */
+    private function mysql(string $term, array $filters, int $limit): array
+    {
+        $like = self::escapeLike($term);
+        $columns = ['name', 'name_si', 'aliases', 'short_code'];
+        $useFullText = mb_strlen($term) >= 2;
+        $words = array_values(array_filter(preg_split('/\s+/u', $term) ?: []));
+        $everyWord = [];
+
+        if ($words !== []) {
+            $everyWord = $this->mysqlProducts($filters)
+                ->where(function (Builder $query) use ($words): void {
+                    foreach ($words as $word) {
+                        $wordLike = '%'.self::escapeLike($word).'%';
+                        $query->where(fn (Builder $query) => $query
+                            ->where('name', 'like', $wordLike)
+                            ->orWhere('name_si', 'like', $wordLike)
+                            ->orWhere('aliases', 'like', $wordLike)
+                            ->orWhere('short_code', 'like', $wordLike)
+                            ->orWhereHas('variants', fn (Builder $variants) => $variants->where('name', 'like', $wordLike))
+                            ->orWhereHas('brand', fn (Builder $brand) => $brand->where('name', 'like', $wordLike)));
+                    }
+                })
+                ->orderByDesc('sales_velocity_30d')
+                ->orderBy('name')
+                ->limit($limit)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        $query = $this->mysqlProducts($filters)
+            ->where(function (Builder $query) use ($term, $like, $columns, $useFullText): void {
+                if ($useFullText) {
+                    $query->whereFullText($columns, $term);
+                }
+                $query->orWhere('short_code', 'like', "{$like}%")
+                    ->orWhere('name', 'like', "%{$like}%")
+                    ->orWhere('name_si', 'like', "%{$like}%")
+                    ->orWhere('aliases', 'like', "%{$like}%")
+                    ->orWhereHas('variants', fn (Builder $variants) => $variants
+                        ->where('short_code', 'like', "{$like}%")
+                        ->orWhere('name', 'like', "%{$like}%"))
+                    ->orWhereHas('brand', fn (Builder $brand) => $brand->where('name', 'like', "%{$like}%"));
+            });
+
+        if ($useFullText) {
+            $query->orderByRaw('MATCH (name, name_si, aliases, short_code) AGAINST (? IN NATURAL LANGUAGE MODE) DESC', [$term]);
+        }
+
+        $ids = $query
+            ->orderByDesc('sales_velocity_30d')
+            ->orderBy('name')
+            ->limit($limit)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_slice(array_values(array_unique([...$everyWord, ...$ids])), 0, $limit);
+    }
+
+    /**
+     * Product ids query with the search filters (active, category, brand) applied.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Product>
+     */
+    private function mysqlProducts(array $filters): Builder
+    {
+        return Product::query()
+            ->select('products.id')
+            ->when(! ($filters['include_inactive'] ?? false), fn (Builder $query) => $query->active())
+            ->when(! empty($filters['category_id']), function (Builder $query) use ($filters): void {
+                $category = Category::find($filters['category_id']);
+                $query->whereIn('category_id', $category?->descendantIdsAndSelf() ?? [0]);
+            })
+            ->when(! empty($filters['brand_id']), fn (Builder $query) => $query->where('brand_id', $filters['brand_id']))
+            ->when(! empty($filters['supplier_id']), fn (Builder $query) => self::suppliedBy($query, (int) $filters['supplier_id']));
+    }
+
+    /**
+     * Every product the supplier supplies, A–Z (purchase order picker with nothing typed yet).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<int>
+     */
+    private function supplierProductIds(array $filters, int $limit): array
+    {
+        return $this->mysqlProducts($filters)
+            ->orderBy('name')
+            ->limit($limit)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    private static function suppliedBy(Builder $query, int $supplierId): Builder
+    {
+        return $query->whereIn('products.id', DB::table('supplier_products')->select('product_id')->where('supplier_id', $supplierId));
+    }
+
+    private static function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
+    /**
+     * Load the products in the given order and turn them into result items. Products
+     * with variants become one item per active variant (or just the matched variant).
+     *
+     * @param  list<int>  $ids
+     * @return list<array<string, mixed>>
+     */
+    private function hydrate(array $ids, ?int $priceListId, ?User $user, string $term = '', ?int $onlyVariantId = null): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var Collection<int, Product> $products */
+        $products = Product::query()
+            ->with(['brand', 'category', 'baseUnit', 'units.unit', 'opensInto.baseUnit', 'variants' => fn ($query) => $query->where('is_active', true)])
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        $prices = $priceListId !== null ? $this->priceBook->selling($ids, $priceListId) : null;
+        $showCost = $user?->can('viewCost', Product::class) ?? false;
+        $stock = $this->stock->totals($ids);
+        $expiry = $this->nearestExpiry($products->where('track_expiry', true)->keys()->all());
+        $items = [];
+
+        foreach ($ids as $id) {
+            $product = $products->get($id);
+
+            if ($product === null) {
+                continue;
+            }
+
+            $base = $this->item($product, $prices, $showCost);
+            $base['stock'] = $stock[$id][0]['available'] ?? '0.000';
+            $base['expiry'] = $expiry[$id][0] ?? null;
+            $variants = $onlyVariantId !== null
+                ? $product->variants->where('id', $onlyVariantId)
+                : $this->matchingVariantsFirst($product->variants, $term);
+
+            if ($product->has_variants && $variants->isNotEmpty()) {
+                foreach ($variants as $variant) {
+                    $items[] = [
+                        ...$base,
+                        'key' => "{$product->id}-{$variant->id}",
+                        'variant_id' => $variant->id,
+                        'short_code' => $variant->short_code,
+                        'name' => "{$product->name} {$variant->name}",
+                        'variant_name' => $variant->name,
+                        'stock' => $stock[$id][$variant->id]['available'] ?? '0.000',
+                        'expiry' => $expiry[$id][$variant->id] ?? null,
+                    ];
+                }
+            } else {
+                $items[] = $base;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Earliest expiry date of batches that still have stock to sell (the one FEFO sells next).
+     *
+     * @param  list<int>  $productIds
+     * @return array<int, array<int, string>> product_id => [variant_id or 0 => Y-m-d]
+     */
+    private function nearestExpiry(array $productIds): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('stock_levels')
+            ->join('batches', 'batches.id', '=', 'stock_levels.batch_id')
+            ->whereIn('stock_levels.product_id', $productIds)
+            ->whereNotNull('batches.expiry_date')
+            ->whereRaw('stock_levels.qty_on_hand - stock_levels.qty_reserved > 0')
+            ->groupBy('stock_levels.product_id', 'stock_levels.variant_id')
+            ->selectRaw('stock_levels.product_id, stock_levels.variant_id, MIN(batches.expiry_date) AS expiry')
+            ->get();
+
+        $expiry = [];
+
+        foreach ($rows as $row) {
+            $expiry[(int) $row->product_id][(int) ($row->variant_id ?? 0)] = substr((string) $row->expiry, 0, 10);
+        }
+
+        return $expiry;
+    }
+
+    /**
+     * "tyre 26" lists the 26" variant before the 28" one.
+     *
+     * @param  Collection<int, ProductVariant>  $variants
+     * @return Collection<int, ProductVariant>
+     */
+    private function matchingVariantsFirst(Collection $variants, string $term): Collection
+    {
+        $tokens = array_filter(preg_split('/[\s"\']+/u', mb_strtolower($term)) ?: []);
+
+        return $variants->sortByDesc(function (ProductVariant $variant) use ($tokens): int {
+            $name = mb_strtolower(str_replace(['"', "'"], '', $variant->name));
+
+            return count(array_filter($tokens, fn (string $token) => str_contains($name, $token)));
+        })->values();
+    }
+
+    /**
+     * @param  SellingPrices|null  $selling  null when no price list was asked for
+     * @return array<string, mixed>
+     */
+    private function item(Product $product, ?SellingPrices $selling, bool $showCost): array
+    {
+        $prices = $selling?->startingPrices($product->id) ?? [];
+
+        $units = $product->units->map(fn (ProductUnit $unit) => [
+            'id' => $unit->unit_id,
+            'name' => $unit->unit->name,
+            'symbol' => $unit->unit->symbol,
+            'factor' => $unit->factor,
+            'allows_decimal' => $unit->unit->allows_decimal,
+            'price' => $prices[$unit->unit_id] ?? null,
+            // Rates by quantity in base units (loose goods: under 1 kg, from 1 kg).
+            'tiers' => $selling?->tiers($product, $unit->unit_id) ?? [],
+            'is_default_sale' => $unit->is_default_sale,
+            'is_default_purchase' => $unit->is_default_purchase,
+        ])->values()->all();
+
+        $default = collect($units)->firstWhere('is_default_sale', true) ?? ($units[0] ?? null);
+
+        $item = [
+            'key' => (string) $product->id,
+            'id' => $product->id,
+            'variant_id' => null,
+            'short_code' => $product->short_code,
+            'name' => $product->name,
+            'variant_name' => null,
+            'name_si' => $product->name_si,
+            'brand_id' => $product->brand_id,
+            'brand' => $product->brand?->name,
+            'category' => $product->category?->name,
+            'is_active' => $product->is_active,
+            'unit' => $default,
+            'price' => $default['price'] ?? null,
+            'units' => $units,
+            // Available stock in base units (on hand − reserved), filled in by hydrate().
+            'stock' => null,
+            'base_unit' => $product->baseUnit?->symbol,
+            'reorder_level' => $product->reorder_level,
+            'track_batches' => $product->track_batches,
+            'track_expiry' => $product->track_expiry,
+            'sold_loose' => $product->sold_loose,
+            'opens_into' => $product->opensInto !== null ? [
+                'id' => $product->opensInto->id,
+                'name' => $product->opensInto->name,
+                'qty' => $product->opens_into_qty,
+                'unit' => $product->opensInto->baseUnit?->symbol,
+            ] : null,
+            'url' => route('catalog.products.show', $product),
+        ];
+
+        if ($showCost) {
+            $item['reference_cost'] = $product->reference_cost;
+            $item['min_selling_margin_pct'] = $product->min_selling_margin_pct;
+        }
+
+        return $item;
+    }
+}

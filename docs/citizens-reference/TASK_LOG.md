@@ -1,0 +1,489 @@
+# CITIZENS Agro POS: Task Log
+
+> Running record of project progress. Updated after every request.
+> Plan: [ARCHITECTURE.md](ARCHITECTURE.md) · [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) · Printing: [PRINTING.md](PRINTING.md) · Users: [USER_GUIDE.md](USER_GUIDE.md)
+
+---
+
+## Current status
+
+| Item | Status |
+|---|---|
+| **Current phase** | Phase 7: Reports, Dashboard, Go-live (software built; go-live steps in the shop still to do) |
+| **Last updated** | 2026-11-05 |
+| **Tests** | 537 Pest tests, all pass (full run 2026-10-17, 3,390 assertions, ~4.5 min). |
+| **Static analysis** | Larastan level 6: 0 errors · Pint: clean |
+| **Open issue** | Owner's browser sign-in problem ("These credentials do not match our records"). A headless Chrome signed in to `http://citizens.test` as `owner` / `password` without trouble on 2026-09-24, so the server side works. Still waiting for the owner's retry in a private window. |
+| **Next** | Owner: answer the payroll questions below (4, 8–10), then add the employees (HR → Employees, link each to their login), check the shop hours (HR → Shifts, holidays & leave) and enter this year's Poya and public holidays. Then work down **Administration → Go-live**: product import, opening stock, customer and supplier balances (new Excel import), bank balances, terminals and printers, training, parallel run. Still to write: the 1-page Sinhala quick guides per role (need the owner's OK on the wording). |
+
+### Phase progress
+
+| Phase | Name | Status |
+|---|---|---|
+| 0 | Foundation + printing spike | 🟡 Built · real-printer test pending |
+| 1 | Catalog + Search | 🟡 Built · real product import + 30-phrase search check pending |
+| 2 | Inventory + Purchasing | 🟡 Built · opening stock check + real PO/GRN run pending |
+| 3 | POS core: counter invoices, settlement, Live Billing, handover | 🟡 Built · real printers, drawer and Reverb test pending |
+| 4 | Customers, Credit, Returns, Quotations | 🟡 Built · real customer list + in-shop credit/return run pending |
+| 5 | Finance & Banking | 🟡 Built · real bank accounts + opening balances pending |
+| 6 | HR, Attendance, Payroll | 🟡 Built · staff list, shop hours, holidays and payroll rules pending |
+| 7 | Reports, Dashboard, Go-live | 🟡 Built · Sinhala quick guides, hardware install, training and parallel run pending |
+
+### Open questions for the owner
+
+1. **VAT:** is the shop VAT-registered? Any tax-exempt products? (A "VAT 18%" rate is seeded **inactive**; products have no tax until this is answered.)
+2. **Product list:** please fill the import template (Products → Import from Excel → Download template) or send the old system's export.
+3. **Short code ranges:** OK with Fertilizers 1000–1999, Seeds 2000–2999, Agro-chemicals 3000–3999, Tools 4000–4999, Bicycle Parts 5000–6999, Other 9000–9999? (Editable on the Categories page.)
+4. **Payroll:** built with EPF/ETF as in the plan, ticked per employee (untick "EPF / ETF member" for staff who are not in EPF; that gives simple basic + allowances − deductions). Please confirm: EPF 8 % + 12 %, ETF 3 %, overtime = 1.5 × basic ÷ 240 per hour, counted only from 30 minutes after closing (all in Settings → HR & payroll).
+5. **Printer model:** which 80 mm printer will be bought? Buy one first and run the printing test.
+6. **Real credit customers:** dummy customers are used for now (owner's choice, 2026-09-25). Before go-live, send the real list (name, phone, what each owes, limit, credit days).
+7. **Counter staff and customers:** the reply "can counter staff" looked cut off. For now counter staff can add customers (no credit) but not set credit limits. Please confirm, or say if staff should also set limits.
+8. **Shop hours:** the default shift is 08:00–18:00, Monday to Saturday, late after 10 minutes. Is the shop open on Sundays? Different hours for anyone?
+9. **Days with no attendance record:** a past working day with no clock-in and no leave counts as **absent (no pay)**. Is that right, or should such days be paid unless marked absent? (Until everyone clocks in every day, the first payroll will show no-pay days to correct.)
+10. **Allowances on no-pay days:** fixed allowances (transport, attendance …) are paid in full even when there are no-pay days; only the basic salary is cut. Should they be cut too?
+
+---
+
+## Decisions made
+
+| Date | Decision |
+|---|---|
+| 2026-09-24 | Stack: Laravel 13 + MySQL 8, modular monolith (`app/Domain/*`). |
+| 2026-09-24 | **No Filament**: every page is a hand-written Blade view (Tailwind + Alpine.js). |
+| 2026-09-24 | Roles: Super Admin (owner), Manager (1), Sales Staff (3 counters). Sales Staff may create purchase orders (quantities only, no cost prices); Manager/Owner approve. |
+| 2026-09-24 | **Shop flow:** counter staff bill, take the customer's cash, print the invoice (paid + balance) on the counter printer, and bring invoice + cash to the main cashier, who settles it. |
+| 2026-09-24 | Cashier authority can be handed to the Manager temporarily (cash count both ways, auto-expiry, remote revoke). Finance, payroll and admin can never be delegated. |
+| 2026-09-24 | **Live Billing:** owner's screen split into 3 columns showing each counter's bill in real time. |
+| 2026-09-24 | **4 USB thermal printers** (Counter 1–3 + main); cash drawer only on the main printer. Same model for all; buy one first and test. |
+| 2026-09-24 | **Small invoices print in Sinhala**: printed as an image by Chrome (`--kiosk-printing`), because thermal printers have no Sinhala font. |
+| 2026-09-24 | A4 PDFs via spatie/laravel-pdf **chrome driver** (headless Chrome); dompdf can't shape Sinhala. |
+| 2026-09-24 | Poison/agro-chemical sales: customer name/NIC **not** required. |
+| 2026-09-24 | On-premises server in the shop; Tailscale for the owner's remote access. |
+| 2026-09-24 | Development: local MySQL 8.0 (`citizensDB`, root), Docker only for Redis + Meilisearch, site served by Laravel Herd at `http://citizens.test`. |
+| 2026-09-24 | **No git** in this project (owner's instruction). |
+| 2026-09-24 | Products get a `reference_cost` (cost per base unit) for the minimum-margin check until batch costs exist in Phase 2. Opening stock from the import is kept in `opening_stock_entries` and posted as OPENING stock in Phase 2. |
+| 2026-09-24 | Import only **adds** products; an existing short code is an error. `retail_price`/`wholesale_price` are for the default sale unit; other units get the proportional price. |
+| 2026-09-24 | A deleted product's short code is never reused. Variants share the product's prices. |
+| 2026-09-24 | Excel: `maatwebsite/excel` 4.0 (the Laravel 13 compatible release). |
+| 2026-09-25 | Stock only changes through `StockService` (locked rows, append-only `stock_movements`). Stock can never go below zero unless Settings → Inventory allows it. |
+| 2026-09-25 | Products without batch tracking keep one "general stock" batch with a **moving-average** cost; batch-tracked products get one batch per delivery (FEFO issue, FIFO cost). |
+| 2026-09-25 | GRN batch cost = line total after the GRN discount ÷ all units received, so **free goods lower the cost**. The product's reference cost follows the last GRN. |
+| 2026-09-25 | Receiving more than is still outstanding on a PO line is refused; extra goods go in as free quantity or a separate line. Posted GRNs are never edited; mistakes are fixed with a supplier return. |
+| 2026-09-25 | Stock adjustments and stocktake differences above **Rs. 10,000** (Settings → Inventory) need the Super Admin. |
+| 2026-09-25 | Journal postings for GRNs and adjustments are left for Phase 5 (Finance), when the chart of accounts exists. Supplier payments also come with Phase 5. |
+| 2026-09-25 | **Credit:** a credit sale needs a customer. It hits the customer's account when the cashier settles it (not when it prints), due after the customer's credit days. Going over the credit limit needs the Super Admin's tick at settlement; a delegated Manager can never allow it. |
+| 2026-09-25 | Counter staff may quick-add a customer (name, phone, village) with no credit; only the Owner/Manager set credit limits. Phone numbers are unique. |
+| 2026-09-25 | Customer payments are taken at the main cashier (drawer holder); cash counts in the drawer. Oldest invoice first unless the cashier chooses; any extra stays as an advance. |
+| 2026-09-25 | **Returns** only at the main cashier (`pos.refund`), always against the original invoice. Refund = the line's share after the bill discount; cash from the drawer, or credit to the customer's account (forced while a credit invoice is unpaid). Stock goes back to the batches it was sold from; damaged goods are written off as DAMAGE. A returned invoice can no longer be voided. |
+| 2026-09-25 | **Quotations** reserve no stock and are billed at today's prices when loaded (F7); valid 7 days (Settings → Customers). Owner confirmed today's prices. |
+| 2026-09-25 | **Credit bill:** when the cashier settles a credit sale, a "ණය බිල්පත / Credit bill" (shop copy) prints on the main printer with the customer's details, items, total, due date and account balance, and space for the customer's signature, the owner's signature and the shop seal. The shop keeps it. Reprints are marked COPY. |
+| 2026-09-25 | Returns: cash or credit to account, confirmed by the owner. |
+| 2026-09-25 | **No SMS** reminders (owner). Overdue credit is only a morning bell notification to the Owner/Manager; the SMS code and setting were removed. Dummy customers for development. |
+| 2026-09-25 | **Journal posting** happens inside the same database transaction as the sale, payment, GRN, adjustment or drawer action (called directly, not through queued listeners), so a document can never exist without its journal entry. Each document posts once per event; entries are never edited, only reversed. |
+| 2026-09-25 | **Cash places:** Cash drawer (main cashier), Safe, bank accounts, and the Owner (capital in, drawings out). Opening float comes from the safe; at closing the counted cash goes back to the safe and a shortage/excess is posted as Cash short / Cash over. Drawer "pay in" = change from the safe, "pay out" = cash the owner takes, "safe drop" = to the safe. Shop expenses go through Expenses. |
+| 2026-09-25 | Card and bank-transfer payments go to the one bank account marked for them (else a clearing account). Cheques from customers go to "Cheques in hand" and only reach the bank when marked cleared; post-dated cheques cannot be deposited early. A bounced cheque makes the customer owe it again (the invoices it paid are unpaid again); a walk-in customer's bounced cheque goes to "Dishonoured cheques". |
+| 2026-09-25 | Banks, cheques, the journal, the chart of accounts and financial reports are **Super Admin only** (never delegated). The Manager records petty-cash expenses from the drawer; only the owner pays from the safe or a bank, cancels expenses and pays suppliers. |
+| 2026-09-25 | Supplier payments are applied to goods receipts oldest first (or as chosen); extra stays as an advance. A cancelled or bounced supplier cheque makes those receipts unpaid again. |
+| 2026-09-25 | **Owner:** returns to a supplier go back at the **buying price** (the goods receipt price, net of its discount; else the supplier's last price), not the average stock cost. The difference to the stock cost is a stock gain / loss. |
+| 2026-09-25 | **Owner:** the owner enters the opening bank balances and every bank movement (deposits, transfers, cheque deposits). Card and bank-transfer payments wait under "Card & transfer payments" until moved into a bank (automatic posting can still be switched on per bank account). |
+| 2026-09-25 | **Owner:** the counted cash goes home at closing and the next day starts with the cashier's morning float brought from it. The "safe" account is shown as **Cash at home (day's takings)**. |
+
+| 2026-09-26 | **Attendance:** the first PIN sign-in of the day on a shop terminal clocks the employee in; they clock out with the button in the top bar. Late = after the shift start + grace minutes; overtime = minutes after the shift end (from 30 minutes); on a day off or a holiday every minute is overtime. Only the Super Admin corrects attendance (with a reason, audited); the Manager can view it. |
+| 2026-09-26 | **Reports:** a sale counts on the day it was settled (like the books); a return counts on the day it was taken, against the original sale's counter, staff member and customer; a voided sale does not count. Item, category and brand figures share each bill discount across the lines. Reports over 12 months read the nightly summary. Profit reports are Super Admin only; the Manager sees sales and stock reports with cost. |
+| 2026-10-07 | **Owner dashboard** follows the owner's mockup, in the brand green. No sub-dealer split (owner: leave it out). Gross profit shown for today and for this month (owner only). A supplier bill is due its supplier's payment terms after the goods receipt and is "Due soon" within **7 days** (owner). No branch picker or stock transfers (one shop); that tile opens Open packs. |
+| 2026-09-26 | **Payroll:** no-pay = no-pay days × basic ÷ working days; OT = hours × basic × 1.5 ÷ 240; EPF/ETF on basic − no-pay + allowances marked "EPF applies" (not on OT). Approving posts the salaries as owed (Dr Salaries, EPF/ETF expense; Cr Salaries payable, EPF/ETF payable, Staff advances); paying moves the money (drawer, cash at home or bank, one entry per person). An approved payroll can be reopened until someone is paid. Payroll, employees and advances are Super Admin only and can never be handed over. |
+| 2026-10-09 | **Backups to the server's backup hard disk only, for now.** Cloud storage later, when the owner buys it (add its disk to `BACKUP_DISKS`). |
+| 2026-10-09 | **Manual cash drawer for about one more year.** The drawer logic (sessions, counts, handover, Z report, QZ drawer kick) stays in the code; the "drawer did not open" alert after settlement is commented out until a printer-driven drawer is fitted. |
+| 2026-10-10 | **The shop server is also the main cashier** (Ubuntu Desktop, Chrome kiosk for a `cashier` user, printer #0 via CUPS). 4 computers in total: server/main cashier + 3 counter PCs. The thermal printer model must pass the Sinhala print test on both Windows and Linux. |
+| 2026-10-15 | **Supplier invoice photos** on every GRN (PO or direct delivery), taken with the phone camera or picked from the gallery (photos or PDF). Saved on the server's local disk, one folder per supplier (`supplier-invoices/<supplier-name>/`). Owner/Manager attach; after posting, only the Owner removes. |
+---
+
+## Log
+
+Newest first.
+
+### 2026-11-05: Planning a second POS for a hardware shop (questions only)
+Owner wants a copy of this POS for a hardware shop (10,000+ products, some with maker barcodes, a barcode scanner at the counters). Planning only, no code changed. Found: the system has **no barcode support** today (no barcode column; ARCHITECTURE.md § 6 was designed "no barcode"), but the POS search already adds an item at once on an exact short code, so a USB scanner (it types the code + Enter like a keyboard) fits in easily. Proposed: a `product_barcodes` table (many barcodes per product, each tied to a unit, e.g. box vs piece), exact barcode lookup before Meilisearch, an "unknown barcode → link to product" step, scanning on goods receipts and stocktake, and shelf/item label printing for goods without a barcode. Sent the owner a list of questions (copy vs shared code, shop flow, units such as metres/feet, variants, barcodes and labels, prices, credit customers, modules to keep, hardware, product data). Waiting for answers.
+
+### 2026-10-18: How to test two laptops over a network cable (main cashier + Counter 1)
+
+Advice only, no code changed. Herd's nginx listens on `127.0.0.1:80` only, so the other laptop cannot reach `citizens.test`. For the test: static IPs on the cable (`192.168.50.1` main, `192.168.50.2` counter), `php artisan serve --host=0.0.0.0 --port=8000`, `REVERB_HOST=192.168.50.1` + `npm run build` so the counter's browser can reach Reverb, Windows firewall open for TCP 8000 and 8080, then register each laptop under Admin → Terminals (cookie is per address, so use `http://192.168.50.1:8000` on both). Put `.env` back and rebuild afterwards.
+
+### 2026-10-17: Shorter Add product form, automatic short code + SKU
+- **Catalog → Products → Add/Edit, General tab** rearranged into a 3-column grid (was 2 columns, 12 rows): Name (English) first (cursor starts there), then Category · Brand · Base unit, then Short code · SKU · Tax, then Sold loose · Can be opened into · Loose quantity, then Description (2 rows) · Active. Hints shortened. "Can be opened into" hides for loose products (unless already set) and "Loose quantity in one pack" shows only once an opened-into product is chosen.
+- **Automatic SKU:** choosing a category and/or brand fills the short code (as before) **and** the SKU: first 3 letters of the category + brand + next free number, e.g. `FER-BAT-001` (Fertilizers, Bathalagoda Agro), `FER-001` with no brand. Deleted products' SKUs are counted, so they are not reused. Like the short code, automatic filling only replaces a value the user hasn't typed, and only on new products; **Suggest** refills both (also on Edit). Names with no Latin letters fall back to the id (`C12`, `B3`).
+- Files: new `Catalog/Services/SkuGenerator`, `ProductController` (`create` pre-fills the SKU, `nextCode` takes `brand_id` and returns `sku`), `catalog/products/form.blade.php`, `USER_GUIDE.md` § 6.2.
+- Tests: 2 new in `ProductManagementTest`; full suite 537 pass. PHPStan on the changed files: 0 errors; Pint clean. No CSS/JS build needed (Blade + inline Alpine only).
+
+### 2026-10-16: Full hardware shopping list for hosting
+- **DEPLOYMENT.md § 3** rewritten as a full bill of materials with the capacity to ask for: at-a-glance table + what sits where, computers (server summary, counter business mini PCs), monitors/keyboards, 80 mm printers (speed, cutter, head life, Windows + Linux driver) and paper use (~1 × 80 m roll a day), network (8-port gigabit easy-smart switch, **Cat6 23 AWG solid copper, no CCA**, patch panel, wall jacks, factory patch cords, 6U wall cabinet, router/Wi-Fi), power (UPS A 1500 VA/900 W **pure sine wave** with load table ≈ 110 W normal / 255 W peak, UPS B 650–850 VA per counter, earth check, Type 2 surge protector, dedicated 13 A circuit), furniture, spares/tools, not needed.
+- § 4.1.1 (UPS, patch cable), § 6.1 (counter PC) and § 9 (UPS table) brought in line. Docs only, no code changed.
+
+### 2026-10-16: Supplier's own products on purchase orders, new supplier / product / brand from the PO window
+- **Supplier seed:** new `DevelopmentSupplierSeeder` (local only, runs after the catalog seeder): Bathalagoda Agro, CIC (both with the details and opening balances the owner had typed in) and Ishara Lak Seeds. Each is linked (`supplier_products`) to the products of its brand: Bathalagoda Agro 43, Ishara Lak Seeds 7, CIC 0 (no CIC products in the catalog yet).
+- **Dev database:** only the supplier tables were reset (`suppliers`, `supplier_products` and their two opening-balance journal entries, no POs/GRNs existed), then the seeder ran again. The opening balances were posted again as JE-2026-000008/9.
+- **PO product search:** once a supplier is chosen, "Add product" finds only that supplier's products, and clicking the empty box lists all of them A–Z. The "Only <supplier>'s products" tickbox (on by default) can be unticked to search everything. Search API: `supplier_id` filter (MySQL, since the search index doesn't know suppliers). Direct deliveries (GRN without a PO) are **not** filtered. Products get linked to a supplier by PO approval, by GRN posting (also direct deliveries) and by the new "New product" pop-up.
+- **New supplier / new product in the PO window** (Owner and Manager only; staff don't see the buttons): "+ New supplier" (name, contact, phone, credit days) picks the new supplier on the order. "+ New product" (name, Sinhala name, category, unit, brand **or a new brand**, cost, selling price, reorder level) gives the next short code in the category's range, links the product to the chosen supplier and adds it as a line. Route `purchasing.purchase-orders.quick-product` (`QuickProductController`). `SupplierController@store` returns JSON when asked.
+- Files: `ProductSearchService`, `ProductSearchController`, `PurchaseOrderController`, `QuickProductController`, `SupplierController`, `purchase-orders/form.blade.php`, `components/ui/product-picker.blade.php` + `alpine/product-picker.js`, `alpine/search-select.js` + component (can be set from outside), `routes/web.php`, `DatabaseSeeder`.
+- Tests: new `Purchasing/PurchaseOrderSupplierProductsTest` (8). Inventory + Purchasing + Catalog: 183 pass; Search: 16 pass. Note: running `tests/Search` in the **same** run before other folders leaks its committed rows into them (existing issue: the Search tests truncate before, not after). PHPStan on the changed files: 0 errors; Pint clean; `npm run build` done.
+
+### 2026-10-16: Brand column on Stock on hand
+- Inventory → Stock on hand: new **Brand** column on the "By product" and "Low stock" tabs (before Category) and on the "By batch" tab (after Product); "—" when a product has no brand. The search box there also matches the brand name ("Code, name, alias or brand").
+- Files: `StockController` (eager-loads `brand`, `brand.name` searchable), `inventory/stock/index.blade.php`.
+- Test: new brand column + brand search test in `InventoryPagesTest` (8 pass).
+
+### 2026-10-16: Demo catalog = the owner's real seed list
+- `DevelopmentCatalogSeeder` now seeds exactly the 51 products in `docs/CITIZENS- Inventory.xlsx` (all Seeds); the old demo fertilizers, chemicals, tools and bicycle parts are gone. Each packet size is its own product ("Okra Haritha 10g packet", unit packet), with the sheet's cost, retail price and reorder level. Blank cost or price → none yet (11 packets show in the no-price filter). The sheet has no wholesale prices and no opening stock.
+- Short codes: one block of ten per family (Okra Haritha 2011–2014, Okra MI5 2021–2024 … Marrow 2171).
+- Names that appear twice in the sheet got a qualifier: "Okra Haritha" / "Okra MI5", "Radish" (Bathalagoda) / "Radish Ishara Lak". Sinhala names copied from the sheet, except two fixes: a stray Tibetan character in "හවරි පොළොන් මෑ" (guessed "න්") and a hidden joiner before the Ishara Lak Radish name. Romanised search aliases added (bandakka, miris, karawila …), since the sheet's Aliases column is empty.
+- Marrow (Land Mark Seeds) has no pack size or price in the sheet; seeded as "Marrow" with no price.
+- Test: the demo-catalog test in `LoosePricingTest` rewritten for the new data; that file passes (26). Full suite not re-run.
+- To load: `php artisan migrate:fresh --seed` (wipes the dev database), then `php artisan scout:sync-index-settings` and `php artisan queue:work --stop-when-empty`.
+
+### 2026-10-16: Product search by brand (company) name, with brand suggestions
+- Search (POS, top bar, line-editor picker) now finds products by brand: "baur" or "baur urea". Meilisearch already indexed the brand; the MySQL fallback now matches brand names too, and products with every typed word in their name / alias / code / variant / brand rank above ngram near-misses.
+- The search API returns `brands` (the brands among the hits, with counts) and each item has `brand_id`. The POS shows brand chips under the search box ("All", "Lanka Fertilizer 2", "Baur 1"); a chip narrows the results to that brand (`brand_id` filter) and they reset when the term changes or an item is added.
+- Each result row in the POS, top-bar search and product picker shows the brand name next to the product name.
+- Products list (Catalog → Products) search also matches the brand name (`HasListQuery` accepts `relation.column`).
+- Renaming a brand reindexes its products in Meilisearch.
+- Tests: brand search, brand chips, brand filter, brand + name (Feature/Catalog/ProductSearchTest, Search/MysqlFallbackSearchTest), products list by brand.
+
+### 2026-10-16: Purchasing → Invoices: a folder for each supplier
+- Owner: a new *Invoices* item under Purchasing that shows every supplier as a file (folder squares, searchable); open one to add the supplier's invoices, bank deposit slips and all other receipts.
+- New tables `supplier_documents` (type, date, number, amount, note, who added it) and `supplier_document_files` (one row per page); enum `SupplierDocumentType` (Invoice, Bank deposit slip, Receipt, Other); models `SupplierDocument`, `SupplierDocumentFile`; `SaveSupplierDocumentAction`, `RemoveSupplierDocumentAction`; `SupplierDocumentPolicy`; `SupplierDocumentController`; `Support/SupplierFolderItem`. Routes `purchasing.invoices.*` (`/purchasing/invoices`).
+- **Folders page:** square folder tiles (yellow = has papers, grey = empty) with counts per type and last update; instant search by name, contact or phone; sort A–Z or recently updated. Inactive suppliers only show while their folder holds papers.
+- **Folder page:** type chips with counts, year filter, search (number, amount, note, file name, GRN no.); document tiles with thumbnail, type badge, date, amount, number, note and page links. The GRN invoice photos from 2026-10-15 also show here as invoices, linked to their GRN. *Add document* reuses the camera/gallery picker (`<x-purchasing.invoice-photos-input>`), so photos are shrunk on the phone.
+- Files: `storage/app/private/supplier-invoices/<supplier-slug>/<invoices|deposit-slips|receipts|other>/<date>_<number>_<n>.jpg`; already covered by the backup.
+- Rules: Owner and Manager (`purchasing.suppliers.manage`); sales staff can't see it. The Owner removes any document; the Manager only their own on the day they added it. Add/remove are in the audit log (on the supplier).
+- Supplier page: new **Invoices & slips** button.
+- Checked in headless Chrome on a throwaway DB (desktop and 390 px phone): folder grid, instant search and no-match message, folder page, camera photo → save → tile, type filter; no sideways scroll. Fixed from the screenshots: "1 invoices" plurals, and squeezed date/amount on phone tiles. Test files removed from storage afterwards.
+- Tests: 9 new (`tests/Feature/Purchasing/SupplierDocumentTest.php`); Purchasing suite 43/43 pass. Pint clean, Larastan 0 errors on the changed code. Migration run on `citizensDB`; `npm run build` done.
+- Docs: USER_GUIDE § 8.6.
+- **Set up on another PC / the server:** `php artisan migrate` and `npm run build`.
+
+### 2026-10-15: Post-dated cheques to suppliers (answer only, no changes)
+- Owner asked how to issue a cheque with a future date, and to build it if missing.
+- Already built in Phase 5: Purchasing → Supplier payments → Pay a supplier → *Paid by: Cheque*, bank account, cheque number, and a later **Cheque date** (post-dated). The supplier's balance drops at once; the bank only drops when the cheque is marked **Cleared** (Finance → Cheques). Cheque calendar, the morning bell alert (issued cheques due within 3 days, Settings → Finance) and the dashboard tile already cover issued cheques.
+- Gap found, not changed: an issued post-dated cheque can be marked *Cleared* before its cheque date. Offered to block that.
+
+### 2026-10-15: Supplier invoice photos on goods receipts (phone camera)
+- Owner: when goods arrive (on a purchase order or a sudden delivery without one), the Owner/Manager photographs the supplier's invoice; the photo is kept on the server in a folder per supplier; works on a phone with a camera button.
+- New table `goods_receipt_invoices` + model `GoodsReceiptInvoice`; `AttachSupplierInvoiceAction`, `RemoveSupplierInvoiceAction`; `GoodsReceiptInvoiceController` (upload, view, remove); policy `attachInvoice` / `removeInvoice`.
+- Files: `storage/app/private/supplier-invoices/<supplier-slug>/<date>_<GRN no.>_<n>.jpg` (`supplier-<id>` for Sinhala-only names). Photos and PDF, up to 10 per upload, 10 MB each. Covered by the existing backup (`storage/app/private`).
+- UI: new component `<x-purchasing.invoice-photos-input>` + Alpine `invoicePhotos`: **Take photo** (`capture="environment"`, opens the back camera) and **Choose files** (gallery/PDF), previews with remove; photos are shrunk in the browser to max 2000 px JPEG (a 7.7 MB test photo went up as 0.9 MB). On the *Receive goods* form and on the GRN page (*Supplier invoice* card with thumbnails, placed above the goods on phones). The GRN list shows a camera badge with the photo count.
+- Fixed: the GRN page was 32 px wider than a phone screen (the goods table pushed the grid column); the table now scrolls inside its card.
+- Rules: Owner/Manager attach to draft or posted GRNs, not cancelled ones; the Manager removes only from drafts, the Owner always; add/remove are in the audit log. Sales staff can't see them.
+- Checked in headless Chrome at phone size (390 px) on a throwaway DB: camera input → preview → save → thumbnail; no sideways scroll on the form or GRN page; desktop layout unchanged.
+- Tests: 11 new (`tests/Feature/Purchasing/GoodsReceiptInvoiceTest.php`); Purchasing suite 34/34 pass. Pint clean, Larastan 0 errors on the changed code. Migration run on `citizensDB`; `npm run build` done.
+- Docs: USER_GUIDE § 8.3.
+- **Set up on another PC / the server:** `php artisan migrate` and `npm run build`.
+
+### 2026-10-11: Parts list for the self-built server
+- Owner chose the physical server in the shop and will assemble it from parts.
+- `docs/DEPLOYMENT.md`: new § 4.1.1 *Parts list* (CPU with built-in graphics, cooler, motherboard, RAM in two sticks, NVMe with DRAM cache, backup HDD, PSU, case, monitor, UPS, minimum vs recommended, BIOS settings and burn-in tests); mini PC wording changed to a self-built desktop. Docs only.
+
+### 2026-10-11: Cloud VM vs physical server compared (answer only, no changes)
+- Owner asked how a rented VM (cloud server) compares with the physical shop server.
+- Answer: keep the physical server. With a cloud VM, selling stops whenever the internet is down (the app has no offline mode), the server can no longer be the main cashier (back to a separate cashier PC), and it adds a monthly bill, a public domain and open ports. A cloud VM's strengths (off-site copies, easy remote access) are better used later for **cloud backups** (DEPLOYMENT.md § 12.3). `DEPLOYMENT.md` not changed.
+
+### 2026-10-10: DEPLOYMENT.md updated: the server is also the main cashier
+- Owner decision: the shop server also works as the main cashier, so 4 computers in total (server/main cashier + 3 counter PCs).
+- `docs/DEPLOYMENT.md` changed: design principle, diagram, what-runs-where, shopping list (3 counter PCs, one 1500 VA UPS, printers need Windows **and** Linux drivers, under-counter compartment), server hardware (16 GB minimum, display out, more USB), memory budget, Ubuntu **Desktop** + CUPS, new § 6.3 *Main cashier on the server* (`cashier` user without sudo, auto sign-in on Xorg, `/etc/hosts` → 127.0.0.1, CUPS printer #0, certificate in the cashier's Chrome, GNOME settings, kiosk autostart), printers, IP plan, UPS, HTTPS, security, install steps, deploy note, monitoring and runbook. Docs only, no code changes.
+
+### 2026-10-10: Can the server also be the main cashier? (answer only, no changes)
+- Owner asked whether the shop server can double as the main cashier PC, so fewer computers are needed.
+- Answer: yes, it works (the app has no Windows-only code). Recommended: Ubuntu Desktop on the server, Chrome kiosk for a restricted user, printer #0 via CUPS. The main risk is Sinhala printing on Linux, so test the chosen printer on Linux first. Other costs: the server sits at the counter instead of a locked cabinet, and one bigger UPS covers server + cashier. `DEPLOYMENT.md` not changed yet; waiting for the owner's decision.
+
+### 2026-10-10: Sidebar account menu animation
+- Owner: animate the popup (My account / My attendance / Clock in-out) opened from the user card at the bottom of the sidebar.
+- The menu now slides up and scales in from the card (fades out on close); menu items tint green and nudge right on hover; the card stays highlighted while the menu is open and the avatar grows slightly with a green ring on hover. Files: `layouts/partials/sidebar-user.blade.php`, `hr/partials/clock-button.blade.php` (app style only). Assets rebuilt.
+
+### 2026-10-09: Medium audit findings fixed (M1–M5)
+- Owner: fix the medium issues from [PRE_DEPLOYMENT_AUDIT.md](PRE_DEPLOYMENT_AUDIT.md).
+- **M1, PIN vs two-factor:** accounts with 2FA are hidden from the PIN screen and a PIN sign-in for them is refused; after a handover/take-back to such an account the terminal signs out and they sign in with password + code (the handover slip prints after sign-in). Note on the account page; login page now shows a status message.
+- **M2, PIN guessing:** new `PinLockout` service: 15 wrong PINs per user per day (`pos.pin.max_failures_per_day`) lock the PIN until midnight, for PIN sign-in and handover PIN checks. Every wrong PIN is in the audit log (`login_failed` / `pin_failed`, then `pin_locked`), the Super Admins get a "PIN locked" notification, and setting a new PIN unlocks it.
+- **M3, Wholesale at the counter:** new permission `pos.price_list.choose` (Super Admin, delegable in a handover). Without it `CartPricer` accepts only the default list or the customer's own list (invoice/quotation refused; live cart falls back). Counter: price list picker locked for staff, follows the customer, back to Retail when the customer is removed. Migration `2026_10_09_100000_sync_permissions_price_list_choose` re-runs the permission seeder (run on the dev DB).
+- **M4, split write-offs:** the adjustment approval limit counts the user's self-posted adjustments of the day plus the new one. Setting label and form text updated.
+- **M5, approval %:** the line/bill amount and label of a discount request now come from the server's synced cart; the counter's `gross`/`label` are ignored and a discount above the line amount is refused. The counter flushes its pending sync before asking.
+- Tests added: PinLoginTest (2), DrawerHandoverTest (1), CounterInvoiceTest (4, plus the approval test now syncs first), StockAdjustmentTest (1). `LoosePricingTest` now bills Wholesale for a Wholesale customer (staff can no longer pick it for a walk-in). Full suite: **503 tests, all passing**; Larastan 0 errors; Pint clean. Docs: audit M1–M5 marked fixed, Implementation Plan § 4 permission table, USER_GUIDE (PIN lock, 2FA, price list).
+
+### 2026-10-09: Backups to the local disk set up; manual cash drawer kept
+- Owner: (1) for now back up only to a local hard disk in the server, cloud later; (2) the shop keeps its manual cash drawer for about a year, so keep the drawer logic but comment out the "drawer can't work" alert.
+- **Backups** (`spatie/laravel-backup`): new `config/backup.php`, a `backup` disk in `config/filesystems.php` (`BACKUP_PATH`, default `storage/app/backups` for development), and mysqldump settings on the `mysql` connection (`--single-transaction`, `DB_DUMP_BINARY_PATH`). Schedule in `routes/console.php`: database-only every hour 08:00–20:00, full backup (database + `storage/app/private|public` + `.env`) at 22:00, `backup:clean` 01:00, `backup:monitor` 07:20. AES-256 encrypted (`BACKUP_ARCHIVE_PASSWORD`), verified after writing. Kept: everything for 2 days, then daily 14 days, weekly 8 weeks, monthly 12 months, yearly 3 years, max 50 GB. Only failures are reported (to the log while `MAIL_MAILER=log`). Cloud later = add a disk and set `BACKUP_DISKS=backup,cloud`. New `BACKUP_*` keys in `.env.example`.
+- Checked for real on the dev machine (into a temporary folder, then deleted): database-only and full backups created, both encrypted and unreadable without the password, dump complete (93 tables); `backup:clean`, `backup:monitor` and `schedule:list` OK. New test `tests/Feature/System/BackupScheduleTest.php` (3 tests: schedule, the 08:00–20:00 window, config).
+- **Cash drawer**: the `this.error` line in `openDrawer()` (`resources/js/pos/live-billing.js`) is commented out with a note to restore it later; the drawer kick itself, the drawer sessions, counts, handover and Z report are unchanged. Leave *Cash drawer connected* unticked on printer #0 until a printer-driven drawer is fitted (then no kick is even attempted). `npm run build` done.
+- Docs: DEPLOYMENT.md § 12 rewritten (schedule, retention, server setup, adding cloud later, restore steps, limits of on-site-only backups), plus the shopping list, server disk, diagram, drawer and runbook updates; Implementation Plan § 16; audit H3 marked done in code; USER_GUIDE.md and PRINTING.md now say the drawer is opened by hand for now. (The branded client PDF of the user guide still says the drawer opens automatically; regenerate it when it is next sent.)
+
+### 2026-10-09: User card and sign-out at the bottom of the sidebar; bigger logo
+- Owner: put the user account and log out option at the bottom of the sidebar (like a typical sidebar); make the top logo wider.
+- New `layouts/partials/sidebar-user.blade.php`: initials, name and role at the bottom of the sidebar (desktop + mobile), with a sign-out icon button. Clicking the name opens a menu upwards: My account, My attendance, Clock in/out. The old user menu in the top bar was removed (it was the same menu).
+- Logo now fills the sidebar width (~208 px instead of ~144 px); logo header 96 px tall.
+
+### 2026-10-09: Sidebar logo and favicon
+- Owner: remove the "POS · v0.8 (Phase 7)" line from the sidebar; use the real logo and favicon from `Media/logo`.
+- Sidebar (desktop + mobile) and sign-in page now show the yellow-pill logo (`public/images/logo.png`, from Asset 35, which has a filled background so it reads on the dark green). The version line is gone. POS top bar gets the round leaf icon (`public/images/logo-icon.png`).
+- Favicons from `icon01`: `favicon.ico` (16–64 px), `favicon-32x32.png`, `apple-touch-icon.png`, linked in `layouts/partials/head.blade.php`.
+
+### 2026-10-09: Full deployment architecture written (docs only, no code changes)
+- Owner: expand Implementation Plan § 16 (Deployment) into the full setup: machines needed, server computer specs and features.
+- New [DEPLOYMENT.md](DEPLOYMENT.md): network diagram, shopping list (server, 4 terminals, 4 + 1 spare thermal printers, cash drawer, 2–3 UPS, switch, 2 rotating backup disks), server hardware (recommended i5/Ryzen 5, 16 GB, 512 GB NVMe) with memory budget and data-growth estimate, software stack with versions and ports (PHP 8.4, MySQL 8.4, Redis 7, Meilisearch 1.12, Reverb, Chromium), terminal specs and Chrome kiosk setup, IP plan and `pos.citizens.local`, UPS sizing and auto-shutdown, mkcert HTTPS, Tailscale, 3-2-1 backups, hardening, ready-to-use config files (`.env`, Nginx with Reverb proxy, PHP, MySQL, Supervisor, cron, Meilisearch), first-install steps, deploy/rollback script, daily checks and a failure runbook.
+- Plan § 16 now links to it; PHP version there updated from 8.3 to 8.4 (matches the dev machine). Audit report: corrected the seeder name to `RolesAndPermissionsSeeder`.
+- Still needed before go-live (from the audit): backups are not configured in code yet (H3), and QZ Tray request signing is still a TODO.
+
+### 2026-10-09: Pre-deployment audit (report only, no code changes)
+- Owner: check the whole codebase for bugs and security holes before deployment, and write the findings to a `.md` file.
+- Report: [PRE_DEPLOYMENT_AUDIT.md](PRE_DEPLOYMENT_AUDIT.md). 3 high (production `.env`/`APP_DEBUG`, leftover `public/hot`, no backups scheduled), 5 medium (PIN sign-in skips 2FA, PIN guessable over time at a terminal, any counter can choose the Wholesale price list, adjustment approval limit can be split, discount-approval % uses gross sent by the counter), 10 low. No SQL injection or XSS found; every controller action is authorized.
+- Tests: 492 total, full run 452 passed / 3 failed / 37 skipped (Meilisearch off). The 2 Catalog failures were MySQL 1412 (flaky, pass in isolation); the dashboard test failure matched the in-progress dashboard change and passes now. Larastan 0 errors, `composer audit` clean, `npm audit` 3 in dev-only build tools.
+
+### 2026-10-09: Dashboard made compact (fits one screen)
+- Owner: remove the empty space under the top bar and fit every widget on screen without scrolling.
+- The layout's `<main>` classes can now be overridden per page (`@section('main_class')`); the dashboard uses the full width with small padding.
+- One header line: title, attention chips (the 2FA warning is now a chip) and date / time. Tighter KPI cards (link next to the sub-text), panels with the "View all" arrow in the header, 1-line table rows, a side-by-side donut, and one row of small quick-action tiles (short labels below 1536 px).
+- Checked in headless Chrome on a throwaway DB: no scrolling at 1920×1080, 1600×900 and 1440×900. A 1366×768 laptop scrolls ~120 px; on a phone it stacks in one column with no sideways page scroll.
+
+### 2026-10-07: Owner dashboard rebuilt from the mockup
+- Owner's answers: leave out sub dealers; gross profit today and this month; supplier bills "Due soon" 7 days ahead.
+- `DashboardData`: new month-to-date sales, gross profit (today / month, like the profit reports), today's payments by method, yesterday comparison, open POs, unpaid supplier bills with due status, today's best sellers by quantity, last 5 sales, active item count, and the open drawer's cash summary (opening, cash sales, cash in, cash out, expected). Removed the 30-day top-10 and the System card's queries.
+- New components `x-dashboard.kpi-card / panel / donut / sparkline / quick-action / icon` (inline SVG, no chart library). `dashboard.blade.php` rewritten: 5 KPI cards, 5 summary panels, recent sales / supplier bills / cash summary, quick actions (each shown only with its permission), and an "attention" strip (waiting settlements, approvals, POs to approve, unposted GRNs, overdue bills, cheques, expiring batches, cashier delegation with Revoke).
+- Manager sees sales, stock, purchasing and recent sales, but no profit, supplier bills or cash. Staff keep the device / cashier tiles plus their quick actions.
+- Tests: dashboard tests rewritten and 2 added (figures, supplier due status); 492 passing, Larastan 0 errors, Pint clean. Checked in headless Chrome at 1440 px and 390 px on a throwaway database (`citizensDB_browser`, dropped afterwards) with demo sales.
+
+### 2026-10-07: Owner dashboard redesign plan (plan only, no code changes)
+- Read the owner's mockup (WhatsApp image, 2026-10-07) and compared it with the current dashboard (`DashboardData`, `dashboard.blade.php`).
+- Wrote a 6-step plan: 5 coloured KPI cards, a row of 5 summary panels (payment split, low stock, best sellers today, counter donut, open POs), recent sales / supplier dues / cash summary, and quick actions. Brand green stays the main colour; blue, violet, amber and teal are used only as card accents.
+- Gaps found: no "sub dealer" customer type (the plan uses the wholesale price list instead), no branches (no branch picker), no stock transfers (the button opens Open packs instead), supplier due date = GRN date + supplier payment terms.
+
+### 2026-10-06: Explained counter staff sign-in and billing (no code changes)
+- Demo counter accounts staff1–3 (password `password`, PIN 3331–3333); register a browser as Counter 1–3 first, then PIN sign-in at `/pin-login`; billing steps with F-keys.
+
+### 2026-10-06: Explained selling and settling (no code changes)
+- Question: invoices stay "Reserved" and on-hand stock does not go down. Answer: that is by design until the invoice is **settled** at the main cashier (print reserves, settle issues). Gave the step-by-step: register MAIN terminal → open drawer → bill (counter or main) → F9 → POS → Cashier → Settle.
+
+### 2026-10-06: Local database rebuilt
+- Ran `php artisan migrate:fresh --seed` on the local `citizensDB` (environment local), then `scout:sync-index-settings` and `queue:work --stop-when-empty`. All migrations (incl. loose pricing / pack openings) and seeders ran; 21 demo products with the new pricing are in place (Okra Haritha 250g has no price on purpose). Demo logins unchanged (owner / manager / staff1–3, password `password`).
+
+### 2026-10-06: Real-world pricing, step 5 built (demo data, user guide, report) — pricing work complete
+- **Demo catalog** (`DevelopmentCatalogSeeder`) now follows the shop: Urea / TSP / MOP (loose, kg, two prices; Urea also has a wholesale from-1-kg price), Urea / TSP / MOP 50kg bags that open into them, Foliar Fertilizer 500ml bottle, Okra Haritha 10g / 50g / 100g / 250g packets with the owner's prices (250g left without a price), Glyphosate 1L bottle, Mancozeb packet, Tyre 26" and 28" as separate products, Tube with size variants (same price), Chain, Brake Cable. Needs `php artisan migrate:fresh --seed` locally (wipes local demo data).
+- **Report** Inventory → *Products without a selling price* (no current Retail price on any unit/tier, removed prices included; links to the edit form). Product list filter **No selling price**. Both use `PriceBook::whereWithoutPrice()`.
+- **User guide:** new 6.5 *How pricing works*, 7.7 *Opening sealed bags*; updated product form (Sold loose, Can be opened into, optional prices, variants vs separate products), import columns and example, search (`750g*urea`), stock movements, GRN *Open now*, billing (grams, wholesale fallback), reports list, `OPN-` numbers, common problems. Removed stray text in the contents list.
+- Tests: 2 more in `LoosePricingTest` (report + filter, demo catalog). Full suite 490 passing · Larastan 0 · Pint clean.
+
+### 2026-10-06: Real-world pricing, step 4 built (importer reads the owner's sheet)
+- **Columns:** template headings now follow the owner's sheet (Product Name, Sinhala Name, Pack Size, Selling Price, Whole Sale Price, Price for Kg's (per kg), Price for grams (per kg) …) plus Opens Into / Loose Qty Per Pack. The owner's own headings ("Product Varients", "Whole Sale Price", "Price for Kg's", "Price for grams") and the old snake_case ones are read too (`ProductImportColumns::key()`).
+- **Pack sizes:** each pack size is its own product ("Okra" + "10g packet" → "Okra 10g packet"); a row with only a pack size continues the product above (name, Sinhala name, category, brand, units). A pack counted in g/kg/ml becomes packet (or bag/bottle from the pack text), with a note.
+- **Loose rows:** Price for grams → price per kg under 1 kg, Price for Kg's → from 1 kg; only one of them → one rate. Errors when the grams price looks per 100 g / per gram (< half the kg price), when a row is both pack and loose, or the base unit can't hold decimals (g is switched to kg with a note).
+- **Prices:** only what the file gives (no more proportional prices for other units). No Selling Price → imported with a note "cannot be billed until a price is set". Wholesale stored as an any-quantity price.
+- **Opens Into:** links a sealed bag to a loose product in the same file or already saved (by name or code); quantity per pack from the column or read from the pack size ("50kg bag" → 50).
+- **Preview:** new "Rows with notes" tile, Prices and Notes columns. **Export** uses the same layout (Cost column only with permission). New unit **bottle** in `CatalogSeeder` (run `php artisan db:seed --class=CatalogSeeder` on the dev/live database).
+- Dry run of `Documents\Citizens Products Price.xlsx` (read-only): 13 products, 0 errors, notes for 4 rows without price and 9 rows whose base unit "grams" became packet.
+- Tests: `ProductImportTest` (5 new; 2 expectations changed on purpose: no proportional kg price, new error wording), `ProductManagementTest` export heading. Full suite 488 passing · Larastan 0 · Pint clean.
+
+### 2026-10-06: Real-world pricing, step 3 built (loose price inputs, grams at the counter)
+- **Product form:** with "Sold loose" ticked, the base unit gets two price rows per list: "Under 1 kg (price per kg)" and "1 kg and above (price per kg)", each with "= Rs. X per 100 g" under it, so the owner's "price for grams" can be entered whatever unit it is quoted in. Empty box = no price (wholesale falls back to retail). Unticking "Sold loose" removes the quantity prices.
+- **Counter:** each unit carries its rates (`SellingPrices::tiers()`, fallback applied), so the screen shows the right rate and "under 1 kg" / "from 1 kg"; unit prices refresh from the server after every sync (also fixes stale prices after a price list change). Quantity box accepts `750g`, `750 g`, `2kg`; lines under 1 kg show "750 g". Search accepts `750g*urea`; results show "from 1 kg: 250.00".
+- **Invoice:** "0.75 kg (750 g) × 300.00" for amounts under 1 kg.
+- `npm run build` done. Tests: 11 more in `LoosePricingTest.php`; full suite 483 passing · Larastan 0 · Pint clean.
+- Still to confirm with the owner: the unit of their "Price for grams" figure (the form takes Rs. per kg and shows the per-100 g equivalent). Next: step 4 importer.
+
+### 2026-10-06: Real-world pricing, steps 1–2 built (loose tiers, retail fallback, Open packs)
+- **Migration** `2026_10_06_103901_add_loose_pricing_and_pack_openings`: `products.sold_loose`, `products.opens_into_product_id` + `opens_into_qty`; `product_prices.min_qty` (quantity tier, base units) and nullable `price` (null row = price removed, history kept); `sale_items.price_list_id`; `grn_lines.open_packs` + `open_weighed_qty`; new `pack_openings` table. Run `php artisan migrate` on the dev database.
+- **Pricing:** `PriceBook::selling()` → `SellingPrices::quote()` picks the customer's list, else Retail; loose products pick the tier for the line's weight (e.g. Rs. 300/kg under 1 kg, Rs. 250/kg from 1 kg). Sealed products ignore tiers. `CartPricer` uses it; each invoice line stores the list its price came from. Search results show the retail fallback. Clearing a price on the product form now removes it (wholesale → retail). Tier prices are checked against the minimum margin. Price Changes report shows tiers and removed prices.
+- **Product form:** "Sold loose", "Can be opened into" and "Loose quantity in one pack". Product page shows tiers, the link and "Removed" in the price history. (Tier price inputs on the form come in step 3.)
+- **Open packs:** `OpenPacksAction` (`OPN-` numbers, `repack_out` / `repack_in` movements, cost carried over, weighed amount kept, lot/expiry carried over, loose reference cost updated). GRN line "Open now · weighed" runs it on posting, so the PO is still fully received. New screen Inventory → Open packs (permission `inventory.adjust`).
+- Tests: `tests/Feature/Catalog/LoosePricingTest.php`, `tests/Feature/Inventory/PackOpeningTest.php` (23 new). Full suite 472 passing · Larastan 0 errors · Pint clean.
+- Next: step 3 (tier price inputs on the product form, gram entry at the counter) once the owner confirms what unit "Price for grams" is in; step 4 importer.
+
+### 2026-10-06: Real-world pricing plan (plan only, no code changes)
+- Owner's rules: every seed packet size is its own product; sealed fertilizer bottles/packets are their own products; loose fertilizer has two rates ("price for grams" for 0–999 g, "price for kg" for 1 kg and above); wholesale price for a few bulk-buying customers; every price column is optional.
+- Plan: `products.sold_loose`, `product_prices.min_qty` (quantity tiers in base units), wholesale falls back to retail, `sale_items.price_list_id`, product form pricing section, gram entry at the counter, importer that reads the owner's sheet layout (continuation rows → separate products) and no longer works out proportional unit prices.
+- Waiting on: what unit the owner's "Price for grams" number is in (per g / per 100 g / per kg).
+- Correction from the owner: a full bag (Urea 50kg) is its own sealed product, never a unit of the loose product. Loose products are sold only by weight (no bag sale price). Plan updated: a bag unit on a loose product is for purchasing only; new "Open a bag" stock action (bag product −1 → loose product +50 kg) if the shop fills loose stock from sealed bags (to confirm).
+- Owner confirmed: when new stock arrives they split it (some bags stay sealed, some are opened and weighed into loose stock); if loose runs out first they open a sealed bag later. Plan: one "Open packs" stock action (`pack_openings` table, `repack_out`/`repack_in` movements, cost carried over) used in both places: an "Open now" field on the GRN line and a standalone screen. Sealed product stores `opens_into_product_id` + `opens_into_qty`; the weighed kg is entered (spillage/over-weight recorded).
+
+### 2026-10-06: Owner's price sheet analysed (no code changes)
+- Explained how pricing works now: `product_prices` (product × unit × price list, insert-only history), tax-inclusive prices, minimum-margin guard, variants share the parent's price.
+- Read the owner's `Documents\Citizens Products Price.xlsx` (seeds, 4 products). Each pack size (10g/50g/100g/250g) has its **own cost, selling price and reorder level**, and prices are not proportional to weight (10g Rs.120 vs 100g Rs.530). Selling price ≈ cost × 1.5–1.67.
+- Gaps found: no per-variant price/cost/reorder level (`product_prices.variant_id` unused); the importer has no variant column, sets `variants => []` and works out other unit prices proportionally. Questions for the owner listed in the chat (loose kg/gram pricing, wholesale, 250g rows with no price, duplicate "Okra" names).
+
+### 2026-10-02: Opening inventory Excel sheet for the owner
+- New client deliverable: `docs/client-deliverables/CITIZENS-Opening-Inventory.xlsx` for the owner to list the shop's goods before handover. Sheet 1 **Products** has 1,000 formatted entry rows: Name (English), Name SI (Sinhala), Aliases, Category, Brand, Base Unit, Sale Units, Default Sale Unit, Opening Stock, Cost (buying), Retail Price (selling), Wholesale Price, Reorder Level. Required headings are red; each heading has a hover note. Category and unit drop-downs come from the **Lists** sheet (the seeded categories/units, warning-only so new ones can be typed); number cells reject text/negatives. **How to fill** sheet explains each column and shows 4 examples (bag-only Urea, kg+bag MOP, tyre, herbicide).
+- Headings are Title Case versions of the import keys (`Name SI` → `name_si`), so the filled file uploads directly through Products → Import. Verified with `ProductImporter::read()` + `check()`: all 4 example rows pass; the blank file reads 0 rows. Generator script kept in the session scratchpad only.
+- No application code changed.
+
+### 2026-09-28: Branded client PDF of the user guide
+- New client deliverable: `docs/client-deliverables/CITIZENS-Agro-POS-User-Guide.pdf` — a 26-page, WorthBe-branded PDF edition of the user guide, written up in fuller, client-facing prose (cover page, document-information page, hyperlinked table of contents, 17 chapters in 6 parts, page-numbered footer on every page). Built from the WorthBe logo (`Media/WorthBe Fb logo.png`) with the cover addressed to "CITIZENS Agro, D.S. Senanayake Street, Ampara" (corrected the street name's spelling from the request). Built with a throwaway Puppeteer + Chrome + pdf-lib pipeline in the session scratchpad (not added to the repo); only the finished PDF was kept. Source content mirrors `USER_GUIDE.md` but is not generated from it, so the two should be kept in sync by hand if either changes.
+- **Noticed:** Chromium's `printToPDF` header/footer templates mis-place the top margin specifically on pages produced by pushing a tall element (e.g. a callout box) whole onto the next page, causing the running header to collide with the first line of body content. Worked around by dropping the running header and keeping only the footer (which was never affected) — the page still carries the WorthBe cover, part/chapter labels and footer branding throughout.
+- No application code changed.
+
+### 2026-09-28: User guide written
+- New `docs/USER_GUIDE.md`: the whole system for Owner, Manager and Sales Staff: roles, sign-in, menu, go-live order, adding products (form tabs and Excel import columns), every way stock moves (opening stock, GRN, sale, returns, adjustments with the Rs. 10,000 approval, stocktake steps), purchasing (PO → GRN → return → payment), a POS day (open drawer, billing keys, settle, void, close, handover), customers/credit, finance, HR/payroll, reports, administration, document numbers and statuses, scheduled jobs, common problems.
+- No code changed. The Sinhala 1-page quick guides per role are still to write.
+
+### 2026-09-26: Phase 7 built (Reports, Dashboard, Go-live)
+- **Reports page** (menu → Reports): one generic report screen (filter bar with date range and quick periods → summary tiles → table with totals → Excel / PDF). 29 reports: *Sales* daily summary / Z report, by item, category, brand, counter, staff, customer, hour; discounts given; settlement waiting time. *Loss prevention* removed items & voids by counter, removed items & cleared bills (detail), reprints, discounts above limit. *Profit* by item, category, day (FIFO cost). *Inventory* stock on hand & valuation, stock by batch, movement history, expiry, dead stock, reorder list, adjustment & stocktake variance. *Purchasing* by supplier, by item, open orders, supplier ageing. *Customers* receivables ageing, credit sales. *Cash & finance* drawer sessions & variances, handover history, expenses. *Audit* price change history, user sign-ins. The existing P&L, trial balance, balance sheet, cash / bank book, cheque register, HR reports, activity and print logs are linked from the same page. Each report checks its own permission.
+- **Exports:** Excel with numbers kept as numbers and a totals row; A4 PDF (landscape for wide reports, Sinhala font embedded). Excel over 5,000 rows is built in the background and announced under the bell (file kept 7 days); PDF over 3,000 rows is refused with a pointer to Excel.
+- **Dashboard:** owner sees net sales today (+ per counter), invoices waiting (amber when the oldest waits 10+ min), expected cash in the drawer, cashier-authority holder with a **Revoke now** button, approvals waiting, stock alerts (with the lowest items), purchasing to do, cheques due, what customers owe / the shop owes, top 10 items (30 days) and a sales-by-hour chart. Manager: sales, stock and purchasing only; staff: shortcuts and stock alerts. Works at phone width (checked at 390 px).
+- **Performance:** new table `daily_sales_summaries` (per day and counter, rebuilt nightly at 02:50 for the last 40 days; `php artisan reports:rebuild-summaries --all` for everything) used by reports over 12 months; indexes for the report filters (void date, payment date, reprints, approvals, GRN status/date, customer payment date, stocktake posting, delegations, activity log).
+- **Go-live** (Administration → Go-live, owner only): readiness checklist (automatic checks for products, opening stock, customers, suppliers, banks, PINs, employee links, terminals, test prints, 2FA; the rest marked "confirm by hand"), and an Excel import of **credit customers and suppliers with their opening balances** (template → check → import, all or nothing; balances posted to the books like the forms).
+- **Tests:** 18 new (449 total): the Z report agrees with the P&L to the cent, item / counter / staff / profit figures add up, the nightly summary equals the live figures, returns land on their own day, loss-prevention counts, stock value, permissions (staff / manager / owner), Excel and PDF downloads, queued export stored per user, dashboard per role, customer and supplier import with the books checked. `phpunit.xml` now sets 512 MB memory for tests (the suite ran out at 128 MB once Excel files were written).
+- **Checked in headless Chrome** (throwaway `citizensDB_browser`, `php -S` on port 8123, 11 sales seeded): dashboard, reports page, Z report, sales by hour, stock valuation, go-live. No JavaScript errors. Fixed: dashboard cards stretched to the tallest card in their row, and the dashboard was 12 px too wide on a phone. The dev database was not touched. Sidebar version label now "v0.8 (Phase 7)".
+- **This PC's `citizensDB`:** migrated (report tables and indexes); no settled sales yet, so the summary rebuild had nothing to do.
+- **Set up on another PC:** `php artisan migrate`, `npm run build`, then `php artisan reports:rebuild-summaries --all`. The scheduler must run for the 02:50 rebuild.
+- **Not done (needs people, not code):** Sinhala 1-page quick guides per role, hardware installation, staff/owner training, parallel run.
+
+### 2026-09-26: Collapsible sidebar
+- Sidebar topics are now collapsible groups, each with an icon and a chevron. Only the group holding the current page opens on load; the others open with a click.
+- Sub-pages sit on a vertical track line with a bullet for each page. The current page's bullet glows; the other bullets don't. Sidebar colours are unchanged.
+- Dashboard is a single top-level link. Rebuilt assets (`npm run build`); 431 tests still pass.
+
+### 2026-09-26: Phase 6 built (HR, Attendance, Payroll)
+- **Tables:** employees, shifts, attendances (one row per employee and day), holidays, leave_types, leave_requests, salary_components (+ per-employee amounts), salary_advances (+ recoveries), payroll_runs, payslips, payslip_lines. New numbers: `E-001` (employees), `ADV-` (advances).
+- **Clock in / out:** first PIN sign-in of the day on a registered terminal clocks the employee in (a second sign-in changes nothing); "Clock out" in the POS top bar and the user menu; "Clock in" there too for someone who signed in with a password. Late, early-leave and overtime minutes come from the shift. Optional webcam photo at the PIN screen (Settings → HR & payroll, off by default; needs HTTPS or a Chrome exception). Morning bell at 07:15 about yesterday's missing clock-outs.
+- **Attendance pages:** daily sheet, month grid for everyone (P / ½ / L / A / H, "?" = no record), click a day to correct it (status, times, reason; audited). Manager: view only. Staff: **My attendance** (their days, leave left, ask for leave).
+- **Leave:** staff ask, the owner approves / rejects / cancels, or enters leave directly. Working days only, half days, yearly balances (seeded: annual 14, casual 7, no-pay). Approved leave writes LEAVE rows into the attendance.
+- **Shifts, holidays & leave types** page; **Allowances & deductions** (fixed or % of basic, "EPF applies"), ticked per employee with an optional own amount.
+- **Salary advances:** from the drawer, cash at home or a bank; recovered in equal monthly installments; can be cancelled until an installment is taken.
+- **Payroll:** choose the month → calculate → check / edit each payslip (no-pay days, OT hours, advance amount, bonus or extra deduction, note) → approve → pay (tick people; drawer, cash at home or bank) → record EPF + ETF paid. Payslip PDF in Sinhala, English or both (two per A4 page when they fit).
+- **Reports:** attendance summary (month), payroll summary (year, by month and by employee), EPF / ETF list (month).
+- **Menu:** new "HR & Payroll" section; Settings → HR & payroll (EPF/ETF rates, OT rate and divisor, OT minimum, photo, missing clock-out bell).
+- **Tests:** 57 new (431 total): late/OT around the shift and grace minutes, day off and holiday OT, PIN clock-in once a day, photo only when switched on, corrections and who may make them, missing clock-out bell, leave days/balances/half days/cancel, a full payroll worked out by hand (no-pay, paid leave, OT, allowances, EPF on/off, advance), joining mid-month, approve / pay / EPF-ETF postings with the books checked after each test, reopen, delete, and that a Manager cannot open payroll even while holding cashier authority. Larastan 0 errors, Pint clean.
+- **Checked in headless Chrome** (throwaway database `citizensDB_browser`, `php -S` on port 8123): every HR page, correcting a day in the month grid, calculate → edit payslip → approve → pay. Found and fixed two bugs: pages with salary components crashed (a Blade variable name clash) and the "Tick all" button on the pay form threw a JavaScript error. Rendered the payslip PDF: Sinhala prints correctly. The dev database was not touched by the check.
+- **This PC's `citizensDB`:** migrated; default shift and leave types added. No employees were added (`DevelopmentHrSeeder` adds four demo employees linked to the demo logins on `migrate:fresh --seed`).
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `php artisan db:seed --class=HrSeeder`, `npm run build`. The scheduler must run for the 07:15 missing clock-out bell.
+
+### 2026-09-25: Owner's answers on Phase 5
+- **Supplier returns at the buying price:** each line now uses what the shop paid the supplier (the goods receipt line the batch came from, else this product's line on the chosen goods receipt, net of that receipt's discount; else the supplier's last price). The supplier's balance goes down by that amount; the stock leaves at its stock cost and the difference is posted as a stock gain or loss. The return page shows "Buying price".
+- **Bank balances entered by the owner:** new bank accounts no longer take card payments automatically (the option is off by default and explained on the form). Card and transfer money waits under "Card & transfer payments"; the Banking page says how much and links to **Move money**, which now has "Card & transfer payments (not yet in a bank)" as a source.
+- **Cash goes home:** the "safe" is now called **Cash at home (day's takings)** everywhere (Banking, Move money, expenses, supplier payments, cash book); the drawer page explains pay in / pay out / safe drop that way. How it works did not change: the morning float comes from it and the counted cash returns to it at closing. Renamed on this PC's `citizensDB` too.
+- **Tests:** 374, all passing (new: return at the goods receipt price with the stock gain, return at the supplier's last price, card money moved into the bank by hand). Larastan 0 errors, Pint clean.
+
+### 2026-09-25: Phase 5 built (Finance & Banking)
+- **Tables:** accounts (chart of accounts), journal_entries + journal_lines, bank_accounts, bank_transactions, bank_reconciliations, cheques, expense_categories, expenses, supplier_payments (+ allocations); goods receipts got `amount_paid`, cash movements a link to the document that took the cash, customer payments `reversed_at`. New numbers: `JE-` (journal), `EXP-` (expenses), `SP-` (supplier payments).
+- **Journal:** `JournalService` refuses any entry whose debits and credits differ and never edits an entry (reversals only). `FinancePosting` holds the posting rules of the plan (section 14) and is called by the existing actions: settlement (cash / card / cheque / credit), void of a settled sale (reversal), returns (restocked and damaged), customer payments, customer and supplier opening balances, GRNs, supplier returns, stock adjustments, stocktakes, opening stock, drawer open / close (variance) and pay in / pay out / safe drop. 28 system accounts are created automatically; each bank account gets its own 15xx account and each expense head a 6xxx account.
+- **Banking** (menu → Finance → Banking): balances of every bank, the safe, the drawer and cheques in hand; add/edit bank accounts with an opening balance; bank book per account with a date range and running balance; bank charges and interest; **Move money** (safe / drawer → bank, bank → safe, bank → bank, owner in / out); **reconciliation** (tick lines on the statement, live difference, history).
+- **Cheques:** received cheques are created by settlement or a customer payment (the payment form now asks for the cheque's bank, branch and date); issued cheques by supplier payments. Register (received / issued, status filter), **post-dated cheque calendar**, cheque page with deposit → cleared / bounced / cancelled and its history. Morning bell at 07:10 for cheques ready to deposit and issued cheques due within 3 days (Settings → Finance).
+- **Expenses:** with a photo or PDF of the bill; paid from the drawer (petty cash, Manager too), the safe or a bank (owner); cancel reverses it and puts the money back; 11 expense heads seeded (rent, electricity, transport …), more can be added.
+- **Supplier payments** (Purchasing → Supplier payments, "Pay supplier" on the supplier page): cash from the drawer or safe, bank transfer or cheque, applied to goods receipts oldest first or as chosen.
+- **Reports:** profit & loss, balance sheet, trial balance, cash book (safe / drawer), journal, chart of accounts with balances and a ledger per account.
+- **Backfill:** `php artisan finance:backfill-journals` posts journals for documents created before Phase 5, oldest first; running it again adds nothing.
+- **Tests:** 62 new (372 total). After every finance test the books are checked: every entry balances, the trial balance balances, receivables = customer ledger, payables = supplier ledger, each bank's ledger account = its bank book. Also: cheque bounce restores the receivable and the invoices, cancelled supplier cheque makes the GRN unpaid again, post-dated deposit blocked, petty cash lowers the drawer's expected cash, the Manager cannot pay from the safe/bank or open banking/journal even while holding cashier authority, backfill gives the same trial balance.
+- **Checked in headless Chrome** (throwaway database `citizensDB_browser`, `php -S` on port 8123): sign-in, banking overview, move money, reconciliation difference updating live, expense form showing the bank only for bank payments, supplier payment page, reports and journal. No JavaScript errors. The dev database was not touched by the check.
+- **This PC's `citizensDB`:** migrated, chart of accounts and expense heads seeded, and the backfill posted the 5 dummy customers' opening balances. No demo bank accounts were added (`DevelopmentFinanceSeeder` adds two on `migrate:fresh --seed`).
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `php artisan db:seed --class=ChartOfAccountsSeeder`, `php artisan finance:backfill-journals`, `npm run build`. The scheduler must run for the 07:10 cheque reminder.
+- **Noticed (not changed):** a return to a supplier of a product without batch tracking is valued at the moving-average cost of the general stock batch, not at the price on the GRN, so the supplier's balance goes down by that average (Phase 2 behaviour). Tell me if returns should use the GRN price instead.
+
+### 2026-09-25: Owner's answers on Phase 4: credit bill, dummy customers, no SMS
+- **Credit bill:** settling a credit sale at the main cashier now also prints a credit bill (`print/credit-bill.blade.php`) on the main printer: customer name (Sinhala), code, phone, NIC, address, items, total, due date, credit days, total owed on the account, the promise to pay, and lines for the customer's signature and the owner's signature plus a box for the shop seal. The cashier screen says "get the customer's signature and stamp the shop seal". A retried settlement does not print it twice. Invoice page: "Credit bill" (view) and "Reprint credit bill" (COPY, main terminal).
+- **Dummy customers:** `DevelopmentCustomerSeeder` (8 customers, Sinhala names, villages, limits, credit days, 5 opening balances, 1 inactive). Runs with `migrate:fresh --seed` locally; added to this PC's `citizensDB` now. Safe to run again.
+- **No SMS:** removed the SMS gateway, its setting and the SMS part of the reminder job; the morning bell notification stays (can be switched off in Settings → Customers & credit).
+- Quotation prices and the return rules stay as built (owner confirmed).
+- **Tests:** 310, all passing (new: credit bill printed once, content, reprint as COPY, none for cash sales; seeder; reminder without SMS). Larastan 0 errors, Pint clean. `npm run build` done.
+
+### 2026-09-25: Phase 4 built (Customers, Credit, Returns, Quotations)
+- **Tables:** customers, customer_ledger, customer_payments (+ allocations), sale_returns (+ lines, + line batches), quotations (+ lines); sales got a customer link, `due_date` and `quotation_id`. New numbers: `C-00001` (customers), `RCP-`, `RET-`, `QT-`.
+- **Customers** (menu → Customers): list with filters (village, owes money, overdue), add/edit with price list, credit limit, credit days and an opening balance from the old books, profile with balance, unpaid invoices, ageing, payments and the account, **statement PDF** (Sinhala/English), and a **credit ageing** report for everyone.
+- **Counter screen:** **F4** finds a customer by phone, name, NIC or village (shows what they owe, credit left, overdue) or quick-adds one (name, phone, village; no credit). The customer's price list is applied. **Credit** payment needs a customer; the invoice prints marked "ණය ඉන්වොයිසිය / CREDIT INVOICE" with the customer. **F7** prints a quotation from the bill; F7 on an empty bill lists open quotations to load and bill.
+- **Cashier:** the settle card shows the customer's balance and limit. Over the limit only the owner can allow it (tick box); a delegated Manager cannot. New buttons: **Customer payment** (oldest invoice first or chosen amounts; extra stays as an advance; Sinhala receipt on the main printer) and **Return** (find the invoice, quantities per line, restock or damaged, cash from the drawer or credit to the account; Sinhala return receipt). Invoice pages have a "Return items" button at the main terminal.
+- **Drawer and Z report:** cash customer payments count in the expected cash; cash refunds are shown separately; the Z report lists customer payments and returns.
+- **Voids:** voiding a settled credit sale takes it off the customer's account; a sale with payments applied or returns can no longer be voided (use a return).
+- **Reminders:** every morning at 07:05 the Owner/Manager get a bell notification about overdue credit. SMS reminders (days 1, 7, 14, 30 overdue) can be switched on in Settings → Customers & credit, but only write to the log until an SMS provider is chosen.
+- **Tests:** 53 new (307 total): credit limit and override, ledger balance = debits − credits = unpaid invoices, FIFO and manual payment allocation, advances, drawer cash, returns never above sold − returned, stock back to the original batch, damage write-off, bill-discount shares adding up to the invoice total, quotations (convert, expiry, idempotency), overdue reminders, and Sinhala receipts.
+- **Checked in headless Chrome** (throwaway database `citizensDB_browser`, served with `php -S` on port 8123): F4 search and select, credit invoice, credit blocked without a customer, F7 quotation → load → bill, quick-add, cashier credit settlement with the balance shown, and the new pages. No JavaScript errors. This found and fixed a bug: the counter's `customer` data and the `customer()` (F4) function had the same name, so the F4 key stopped working after a customer was chosen (renamed to `openCustomer()`). The dev database was not touched by the check.
+- **Also fixed:** this status table still said Phase 2; it now shows Phases 3 and 4 as built.
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `npm run build`. The scheduler must run for the 07:05 overdue reminder. (Done on this PC's `citizensDB`.)
+- **Not checked:** real printers for the new receipts, SMS sending (no provider yet).
+
+### 2026-09-25: Phase 3 built (POS: counter invoices, settlement, Live Billing, handover)
+- **Tables:** drawer_sessions (one open per terminal, database constraint), cash_movements, sales, sale_items, sale_item_batches, payments, approval_requests, counter_events, print_jobs; delegations got `expiry_processed_at`.
+- **Counter screen `/pos`:** search box always focused (codes, names, Sinhala, `5*urea`), favourites / recent / categories, stock badge and expiry hint, cart with unit switch, line and bill discounts, large total, tender panel with quick amounts and a large balance. Keys: F2 search, ↑↓ Enter, + / − / Del, F4, F6, F8 hold / recall, F9 print, F10 reprint, Esc clear. "Last invoices" drawer with reprint.
+- **Printing an invoice (F9):** the server reprices every line (the counter's prices are ignored), checks tendered ≥ total for cash, reserves stock, takes the next gapless number and prints the 80 mm Sinhala invoice silently on that PC's printer. The same key never makes two invoices. A discount above the staff limit waits for the cashier's approval.
+- **Cashier screen `/pos/cashier` (main terminal only, drawer holder with cashier authority):** Live Billing columns with settle cards, find by the last digits, settle (stock issued first-expiry-first-out, payment in the drawer session, drawer kick through QZ Tray for cash), void with a reason (the counter is offered the bill back), discount approvals.
+- **Drawer and handover:** open with a denomination count, pay in / pay out / safe drop, close the day (blocked while invoices wait) with a Z report per counter for the whole day (80 mm and A4). Hand over to the Manager (count, Manager's PIN and matching count, expiry, scope), take back with the owner's PIN, remote revoke from `/admin/delegations`, expiry checked every minute. Handover slips print on the main printer.
+- **Live Billing `/admin/live-billing`:** the same columns, view only, phone tabs. It updates over Reverb and polls every 3 s when Reverb is down.
+- **Also:** invoices list and detail page (items, batches and cost for Owner/Manager, payments, trail), print log, printer test print and reassigning a printer to another terminal, drawer / handover history, dashboard POS card, "invoice sound" setting, nightly counter-event pruning (90 days) and sales-velocity job (deferred from Phase 1).
+- **Tests:** 45 new (254 total): issue → settle, idempotency, repricing, tendered check, stock reservation, first-expiry-first-out batches, voids (waiting and settled), who may settle (staff, Manager with / without handover, counter terminal), expiry, handover and take back, the one-open-drawer constraint, the day-close block, the Z report, cart-sync events, channel authorisation, no costs in Live Billing, and Sinhala invoice rendering.
+- **Checked in headless Chrome** (on a throwaway copy of the database) with two browsers: counter billing → F9 → cashier sees the invoice → settles; discount approval round trip. No JavaScript errors. This found and fixed two search races (a slow result, or Enter pressed straight after typing, could add the wrong item).
+- **Not checked:** real printers and cash drawer, and Reverb (it was not running, so only the 3-second polling was tested).
+- **Set up on another PC:** `php artisan migrate`, `npm run build`. The scheduler must run for handover expiry and the nightly jobs. Start Reverb (`php artisan reverb:start`) for instant Live Billing.
+- **Note:** a first browser run used the development database by mistake (`artisan serve` ignores custom database settings). It registered MAIN and Counter 1 to a test browser, opened a drawer and wrote 11 audit rows. All of it was removed; nothing else was touched.
+
+### 2026-09-25: Sidebar scrollbar colour
+- The sidebar scrollbar is now thin and green to match the sidebar. The sidebar colour itself is unchanged.
+
+### 2026-09-25: Sidebar scrolling fixed
+- The sidebar menu now scrolls when it is taller than the screen. The logo and version line stay in place (desktop and mobile).
+
+### 2026-09-25: Phase 2 built (Inventory + Purchasing)
+- **Tables:** batches, stock_levels, stock_movements (append-only), stock_adjustments (+ lines), stocktakes (+ lines), suppliers, supplier_products, purchase_orders, po_lines, goods_receipts, grn_lines, supplier_returns (+ lines), supplier_ledger, notifications. New document numbers: `SRN-`, `ADJ-`, `STK-`.
+- **Stock engine:** `StockService` does receive, issue (first-expiry-first-out across batches), reserve/release (for Phase 3 counter invoices) and adjust. Rows are locked, so two counters can't both sell the last units. Tested with two real MySQL connections.
+- **Purchasing:** suppliers (balance + ledger), purchase orders (staff enter quantities only; Manager/Owner fill costs and approve or reject; reorder suggestions; A4 PDF; WhatsApp link), goods receipts (from a PO or direct; free quantity, lot, expiry; partial deliveries), supplier returns from a chosen batch.
+- **Inventory pages:** stock on hand (by product / by batch / low stock, stock value for Owner/Manager), expiring stock (30/60/90/180 days, with write-off), movement history, adjustments with approval, stocktakes (tablet counting page that saves each count as you go, printable blind count sheet, review, post).
+- **Also:** bell with notifications in the top bar (PO waiting for approval, PO approved/rejected, adjustment waiting, daily 07:00 stock alert); product search now shows live stock; product page shows stock by batch and recent movements; product list has an "In stock" column and a low-stock filter; Settings → Inventory tab.
+- **Opening stock:** the product import now adds opening stock to inventory straight away. Entries from earlier imports: **Stock on hand → Add opening stock now** (or `php artisan inventory:post-opening-stock`).
+- **Cost hiding:** Sales Staff never see unit costs, PO totals, stock value or batch costs (pages, JSON, PDF). Tested.
+- **Checked in headless Chrome:** the PO line editor (search, unit, cost prefill, totals) and the adjustment editor work with no JS errors.
+- **Tests:** 56 new (209 total), including the plan's acceptance case (staff PO → manager approves → two deliveries → stock and supplier balance correct) and the invariant *stock level = sum of movements* after every inventory test.
+- **Set up on another PC:** `php artisan migrate`, `php artisan db:seed --class=DocumentSequenceSeeder`, `npm run build`. For the daily alert, the scheduler must run (`php artisan schedule:work`, or a Windows task running `schedule:run` every minute).
+- **Noticed:** with Docker stopped, the site returns 500 (sessions, cache and queue use Redis), and product search waits several seconds before it falls back to MySQL when Meilisearch is down. Neither was changed.
+
+### 2026-09-24: Phase 1 built (Catalog + Search)
+- **Tables:** categories (tree + short code range), brands, units, taxes, price lists, products (FULLTEXT ngram index), product variants, product units, product prices (price history), search synonyms, favourite products, opening stock entries.
+- **Code:** `app/Domain/Catalog`: models, factories, policies, `SaveProductAction`, `ShortCodeGenerator`, `PriceBook`, `ProductSearchService`, `SyncSearchSynonymsJob`, Excel import/export (`Import/`).
+- **Pages:** Products (list with filters, 5-tab form with unit editor, price grid with margin check, variants, show page with price history), Categories (tree), Brands, Units, Taxes, Search synonyms, Import (template → check → import), Excel export. Product search box in the top bar (Ctrl+K).
+- **Search:** `GET /api/pos/search` (120/min per user). Exact code wins, then Meilisearch (typos, Sinhala, aliases, synonyms, fast sellers first), and MySQL FULLTEXT + LIKE if Meilisearch is down. `5*urea` gives qty 5. Cost fields only for Owner/Manager.
+- **Seeders:** `CatalogSeeder` (units, price lists, categories with code ranges, inactive VAT) runs everywhere; `DevelopmentCatalogSeeder` adds 11 demo products (urea, TSP, MOP, seeds, chemicals, mammoty, tyres/tubes with variants) locally.
+- **Checked in a real browser (headless Chrome):** created a product with bag = 25 kg, prices, margins and a variant, then found it from the top-bar search. Found and fixed two bugs: the default-sale-unit radios were not saved, and the delete dialog's Cancel button threw a JS error on every page with a delete dialog (Phase 0 `confirm-modal` component).
+- **Tests:** 71 new (153 total). A new `tests/Search` suite commits its rows so MySQL FULLTEXT and the real Meilisearch (`testing_` index prefix, skipped if not running) are tested.
+- **Deferred:** low-stock filter, stock by batch, movement history (Phase 2 tables); `RecalculateSalesVelocityJob` (needs Phase 3 sales).
+- **Set up on another PC:** run `php artisan migrate`, `php artisan db:seed --class=CatalogSeeder`, `php artisan scout:sync-index-settings`, and `npm run build`.
+
+### 2026-09-24: Task log created; duplicate sign-in records fixed
+- Created this task log (`docs/TASK_LOG.md`); it is updated after every request.
+- **Fix:** each successful sign-in was written to the audit log twice (Fortify runs the credential check twice). Moved the "Signed in" record to a `Login` event listener (`app/Listeners/RecordSuccessfulLogin.php`), which writes one record for both password and PIN sign-in, including the method and the terminal code.
+- Tests added: one audit record per sign-in (password and PIN).
+
+### 2026-09-24: Sign-in problem investigated
+- Owner: demo accounts "don't work"; the browser shows "These credentials do not match our records".
+- Checked: accounts exist in `citizensDB`, password and PINs verify; sign-in over HTTP works on `citizens.test`, `127.0.0.1:8000` and `localhost:8000`.
+- Found the owner had changed `APP_URL` to `http://citizens.test/` (Herd).
+- Added **failed sign-in records** to the audit log (username typed + reason: unknown username / wrong password / inactive; never the password), plus a test.
+- Explained that PIN sign-in only works after the PC is registered as a terminal (Terminals → Register this device).
+- Asked the owner to retry in a private window, typing `owner` / `password` by hand.
+
+### 2026-09-24: Phase 0 built
+- Laravel 13 project in `C:\projects\Citizens`; packages: Fortify, spatie permission / activitylog / pdf / backup, Scout + Meilisearch, Reverb, brick/math, chrome-php; dev: Pest 4, Larastan, Boost.
+- Identity: users (username, PIN, active flag), roles and the permission catalogue in `config/pos.php`, delegation service + actions (`Gate::before`), cashier-authority resolver.
+- Terminals + printers: models, device registration by cookie (only the token hash is stored), middleware `terminal`, `terminal:main_cashier`, `terminal:counter`.
+- Sign-in: username + password (Fortify, 2FA available), PIN sign-in on registered terminals with lockout; self-registration and e-mail reset disabled.
+- Pages: dashboard, my account (password, 2FA), users, terminals (register/unregister device), printers, settings (shop EN/SI, invoice, tax, POS rules), audit log, printing test.
+- Blade UI kit: 22 `x-ui.*` components, layouts (app, pos, guest, print), `x-hotkey` directive, search-select.
+- Printing spike: Sinhala 80 mm invoice sample (auto-print for `--kiosk-printing`), QZ Tray cash-drawer kick, A4 Sinhala PDF. Verified the PDF and the 80 mm layout render Sinhala conjuncts correctly.
+- Gapless document numbers (`INV-2026-000001`, yearly reset).
+- Seeders: roles/permissions, 4 terminals + 4 printers, sequences, demo users (local only). Command `php artisan pos:create-owner` for production.
+- Removed the git repository at the owner's request.
+
+### 2026-09-24: Planning
+- Wrote `ARCHITECTURE.md` and `IMPLEMENTATION_PLAN.md` (8 phases, about 25 weeks; MVP after about 14 weeks).
+- Updated for: no Filament, staff purchase orders, Sinhala invoices, 4 printers, counter-billing → settlement flow, Live Billing.
+- Explained the deployment architecture (on-prem server, LAN, UPS, backups, Tailscale).
+
+---
+
+## How to run (development)
+
+1. Start Docker Desktop, then: `docker compose -f docker-compose.dev.yml up -d` (Redis + Meilisearch).
+2. MySQL 8.0 runs as a Windows service (database `citizensDB`).
+3. Open `http://citizens.test` (Laravel Herd), or run `php artisan serve` → `http://127.0.0.1:8000`.
+4. Reset demo data: `php artisan migrate:fresh --seed`, then `php artisan scout:sync-index-settings` and `php artisan queue:work --stop-when-empty` (pushes search synonyms).
+5. Tests: `php artisan test --compact` · Style: `vendor/bin/pint` · Analysis: `vendor/bin/phpstan analyse`.
+6. After changing CSS/JS: `npm run build` (or `npm run dev`).
+
+### Demo accounts (local only)
+
+| Username | Password | PIN | Role |
+|---|---|---|---|
+| owner | password | 1111 | Super Admin |
+| manager | password | 2222 | Manager |
+| staff1 / staff2 / staff3 | password | 3331 / 3332 / 3333 | Sales Staff |
+
+PIN sign-in needs the PC registered first: sign in with a password → **Terminals** → **Register this device**.
