@@ -27,6 +27,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $code
  * @property TerminalType $type
  * @property int|null $counter_no
+ * @property bool $takes_payment
  * @property string|null $device_token_hash
  * @property Carbon|null $registered_at
  * @property int|null $registered_by
@@ -34,7 +35,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property bool $is_active
  * @property Carbon|null $last_seen_at
  */
-#[Fillable(['name', 'code', 'type', 'counter_no', 'receipt_language', 'is_active'])]
+#[Fillable(['name', 'code', 'type', 'counter_no', 'takes_payment', 'receipt_language', 'is_active'])]
 #[Hidden(['device_token_hash'])]
 #[UseFactory(TerminalFactory::class)]
 #[UsePolicy(TerminalPolicy::class)]
@@ -51,6 +52,7 @@ class Terminal extends Model
         return [
             'type' => TerminalType::class,
             'counter_no' => 'integer',
+            'takes_payment' => 'boolean',
             'is_active' => 'boolean',
             'registered_at' => 'datetime',
             'last_seen_at' => 'datetime',
@@ -60,7 +62,7 @@ class Terminal extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'code', 'type', 'counter_no', 'receipt_language', 'is_active', 'registered_at'])
+            ->logOnly(['name', 'code', 'type', 'counter_no', 'takes_payment', 'receipt_language', 'is_active', 'registered_at'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -97,6 +99,35 @@ class Terminal extends Model
     public function isCounter(): bool
     {
         return $this->type === TerminalType::Counter;
+    }
+
+    /**
+     * A counter with its own cash drawer: it takes the payment for its own bills.
+     */
+    public function takesPayment(): bool
+    {
+        return $this->isCounter() && $this->takes_payment;
+    }
+
+    /**
+     * Terminals with a cash drawer of their own: the main machine and the counters that take payment.
+     */
+    public function hasOwnDrawer(): bool
+    {
+        return $this->isMainCashier() || $this->takesPayment();
+    }
+
+    /**
+     * May this user open, count and close the drawer here? At the main machine that takes
+     * cashier authority; at a counter that takes payment, whoever may sell at that counter.
+     */
+    public function canRunDrawer(User $user): bool
+    {
+        if ($this->isMainCashier()) {
+            return $user->can('drawer.manage');
+        }
+
+        return $this->takesPayment() && $user->can('pos.sell');
     }
 
     public function isRegistered(): bool

@@ -49,6 +49,11 @@ class TerminalFactory extends Factory
         ]);
     }
 
+    public function takingPayment(): static
+    {
+        return $this->state(fn (array $attributes) => ['takes_payment' => true]);
+    }
+
     public function inactive(): static
     {
         return $this->state(fn (array $attributes) => ['is_active' => false]);

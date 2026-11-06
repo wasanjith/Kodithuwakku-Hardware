@@ -1,10 +1,11 @@
 import qz from 'qz-tray';
 
 /**
- * Opens the cash drawer attached to the main cashier's thermal printer.
+ * Opens the cash drawer attached to this terminal's thermal printer.
  *
  * Settlement prints nothing, so the drawer is kicked with the raw ESC/POS
- * command ESC p 0 25 250 sent through QZ Tray (installed on the main PC only).
+ * command ESC p 0 25 250 sent through QZ Tray (installed on the main PC and
+ * on the counters that take payment).
  *
  * TODO (Phase 3): sign QZ Tray requests with the shop certificate so the
  * "Allow" prompt does not appear.

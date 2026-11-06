@@ -139,15 +139,16 @@ class DrawerCalculator
     }
 
     /**
-     * Voided invoices per counter between two moments.
+     * Voided invoices per counter between two moments; optionally of one terminal only.
      *
      * @return Collection<int, array{terminal: string, count: int, total: string, numbers: list<string>}>
      */
-    public function voidsPerCounter(\DateTimeInterface $from, \DateTimeInterface $to): Collection
+    public function voidsPerCounter(\DateTimeInterface $from, \DateTimeInterface $to, ?int $terminalId = null): Collection
     {
         $sales = Sale::query()
             ->where('status', SaleStatus::Void)
             ->whereBetween('voided_at', [$from, $to])
+            ->when($terminalId !== null, fn ($query) => $query->where('invoiced_terminal_id', $terminalId))
             ->orderBy('invoice_no')
             ->get(['id', 'invoice_no', 'invoiced_terminal_id', 'total']);
 
@@ -244,7 +245,8 @@ class DrawerCalculator
             ->all();
 
         $perCounter = $this->perCounter($ids);
-        $voids = $this->voidsPerCounter($from, $to);
+        // The main report covers the whole shop's voids; a counter's report only its own.
+        $voids = $this->voidsPerCounter($from, $to, $last->terminal->isMainCashier() ? null : $last->terminal_id);
 
         $expected = $last->expected_cash ?? (string) $this->expectedCash($last);
 

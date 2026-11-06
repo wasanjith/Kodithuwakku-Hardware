@@ -52,7 +52,7 @@
     </div>
 
     {{-- Counter columns --}}
-    <div class="grid min-h-0 flex-1 gap-3 md:grid-cols-3">
+    <div class="grid min-h-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <template x-for="(column, index) in snapshot.counters" :key="column.terminal_id">
             <section class="min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200" :class="activeCounter === index ? 'flex' : 'hidden md:flex'" :aria-label="column.name">
                 <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
@@ -63,6 +63,10 @@
                     </div>
                     <span class="shrink-0 rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide tabular" :class="statusClass(column)" x-text="statusLabel(column)"></span>
                 </header>
+                <p x-show="column.takes_payment" class="border-b border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-900">
+                    Takes payment ·
+                    <span x-text="column.drawer ? column.drawer.holder + ' · drawer Rs. ' + money(column.drawer.expected) : 'drawer closed'"></span>
+                </p>
 
                 <div class="min-h-0 flex-1 overflow-y-auto">
                     {{-- Live cart --}}

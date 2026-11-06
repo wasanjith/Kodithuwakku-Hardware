@@ -15,8 +15,10 @@ use Illuminate\Validation\ValidationException;
 /**
  * Count the drawer and close the session: counted cash vs expected → variance.
  *
- * End of day is blocked while any invoice is still waiting for settlement; a handover
- * is not (unsettled invoices move with the cashier authority).
+ * End of day at the main machine is blocked while any invoice is still waiting for
+ * settlement; a handover is not (unsettled invoices move with the cashier authority). A
+ * counter's drawer is never blocked: a bill sent to the main cashier holds no money in
+ * this drawer, and the main machine's own close covers it.
  */
 class CloseDrawerAction
 {
@@ -37,7 +39,7 @@ class CloseDrawerAction
                 throw ValidationException::withMessages(['drawer' => 'This drawer session is already closed.']);
             }
 
-            if ($reason === DrawerCloseReason::EndOfDay) {
+            if ($reason === DrawerCloseReason::EndOfDay && $session->terminal()->firstOrFail()->isMainCashier()) {
                 $waiting = Sale::query()->where('status', SaleStatus::Invoiced)->orderBy('invoice_no')->pluck('invoice_no');
 
                 if ($waiting->isNotEmpty()) {

@@ -11,7 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Only allows requests from a registered terminal, optionally of one type.
  *
- * Usage: 'terminal', 'terminal:main_cashier', 'terminal:counter'.
+ * Usage: 'terminal', 'terminal:main_cashier', 'terminal:counter', and 'terminal:drawer'
+ * for terminals with a cash drawer of their own (the main machine, counters that take payment).
  */
 class EnsureRegisteredTerminal
 {
@@ -29,7 +30,13 @@ class EnsureRegisteredTerminal
             return redirect()->route('terminal.unregistered');
         }
 
-        if ($type !== null && $terminal->type !== TerminalType::from($type)) {
+        $allowed = match ($type) {
+            null => true,
+            'drawer' => $terminal->hasOwnDrawer(),
+            default => $terminal->type === TerminalType::from($type),
+        };
+
+        if (! $allowed) {
             abort(403, 'This action is not available on '.$terminal->displayName().'.');
         }
 

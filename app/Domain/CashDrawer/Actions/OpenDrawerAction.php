@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Start a drawer session on the main cashier terminal with a counted opening float.
+ * Start a drawer session with a counted opening float, on the main cashier terminal or
+ * on a counter that takes payment.
  *
  * If the last session on this terminal was closed for a handover and nobody has taken
  * over yet (e.g. after a remote revoke), the new session continues that day's chain.
@@ -30,8 +31,8 @@ class OpenDrawerAction
      */
     public function handle(Terminal $terminal, User $holder, array $denominations, ?DrawerSession $previous = null): DrawerSession
     {
-        if (! $terminal->isMainCashier()) {
-            throw ValidationException::withMessages(['terminal' => 'The cash drawer is only at the main cashier.']);
+        if (! $terminal->hasOwnDrawer()) {
+            throw ValidationException::withMessages(['terminal' => "{$terminal->displayName()} has no cash drawer of its own."]);
         }
 
         $float = $this->calculator->countTotal($denominations);

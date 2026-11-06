@@ -27,7 +27,7 @@
                 <x-ui.input name="model" label="Model" :value="$printer->model" hint="e.g. Epson TM-T82X" />
                 <x-ui.select name="paper_width_mm" label="Paper width" :options="['80' => '80 mm', '58' => '58 mm']" :value="$printer->paper_width_mm" required />
                 <x-ui.input name="dpi" label="Resolution (dpi)" type="number" :value="$printer->dpi" required />
-                <x-ui.checkbox name="has_cash_drawer" label="Cash drawer connected" :checked="$printer->has_cash_drawer" hint="Only the main cashier printer." />
+                <x-ui.checkbox name="has_cash_drawer" label="Cash drawer connected" :checked="$printer->has_cash_drawer" hint="The main cashier printer, and the printer of a counter that takes payment." />
                 <x-ui.checkbox name="is_active" label="Active" :checked="$printer->is_active" />
             </div>
 

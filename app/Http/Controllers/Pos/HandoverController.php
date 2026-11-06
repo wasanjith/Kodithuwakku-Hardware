@@ -25,7 +25,8 @@ use Illuminate\View\View;
 
 /**
  * Cashier Handover on the main terminal: owner → Manager (with a count and the Manager's
- * PIN), and back again (take back, or count-and-close after a revoke or expiry).
+ * PIN), and back again (take back, or count-and-close after a revoke or expiry). On a
+ * counter that takes payment only the count-and-close is used (a drawer its cashier left open).
  */
 class HandoverController extends Controller
 {
@@ -92,11 +93,12 @@ class HandoverController extends Controller
         abort_unless($session->holder_user_id === $user->id || $user->can('drawer.handover'), 403);
 
         return view('pos.handover.return', [
+            'atMain' => $this->currentTerminal->get()->isMainCashier(),
             'session' => $session->load(['holder', 'delegation']),
             'isHolder' => $session->holder_user_id === $user->id,
             'owners' => User::query()->active()->role(Role::SuperAdmin->value)->whereKeyNot($session->holder_user_id)->orderBy('name')->get(),
             'denominations' => DrawerCalculator::DENOMINATIONS,
-            'authorityEnded' => ! $user->can('pos.settle'),
+            'authorityEnded' => $this->currentTerminal->get()->isMainCashier() && ! $user->can('pos.settle'),
         ]);
     }
 
@@ -112,7 +114,9 @@ class HandoverController extends Controller
         ]);
 
         $user = $request->user();
-        $newHolder = isset($validated['new_holder_id']) ? User::query()->find($validated['new_holder_id']) : null;
+        $atMain = $this->currentTerminal->get()->isMainCashier();
+        // A counter's drawer is only counted and closed here; the next person opens it.
+        $newHolder = $atMain && isset($validated['new_holder_id']) ? User::query()->find($validated['new_holder_id']) : null;
 
         if ($newHolder !== null && ! $newHolder->is($user) && blank($validated['new_holder_pin'] ?? null)) {
             throw ValidationException::withMessages(['new_holder_pin' => "{$newHolder->name} must enter their PIN."]);
@@ -132,7 +136,7 @@ class HandoverController extends Controller
         }
 
         return redirect()->route('pos.drawer.show')
-            ->with('success', 'Drawer counted and closed. Variance Rs. '.number_format((float) $result['closed']->variance, 2).'. The owner opens the drawer when they take over.')
+            ->with('success', 'Drawer counted and closed. Variance Rs. '.number_format((float) $result['closed']->variance, 2).'. '.($atMain ? 'The owner opens the drawer when they take over.' : 'The next person opens the drawer.'))
             ->with('print_url', $slip);
     }
 

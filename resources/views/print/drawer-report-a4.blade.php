@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <h1>{{ $primary === 'si' ? $shop['name_si'] : $shop['name_en'] }} · {{ $title }}</h1>
+    <h1>{{ $primary === 'si' ? $shop['name_si'] : $shop['name_en'] }} · {{ $title }} · {{ $report['terminal'] }}</h1>
     <p class="muted">{{ $report['terminal'] }} · {{ $t('from') }} {{ $report['from']->format('Y-m-d H:i') }} · {{ $t('to') }} {{ $report['to']->format('Y-m-d H:i') }}</p>
 
     <h2>{{ $t('holder') }}</h2>

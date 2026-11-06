@@ -86,16 +86,32 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 
 ### 3.3 Two sales flows, chosen per counter (owner's answers 4 and 5)
 
+*Built in H3 (2026-11-06).*
+
 - 5 terminals: **MAIN** (main server machine, main cashier) + **C1–C4** counters (seeded in H1).
-- Per counter, on Admin → Terminals (set from the main machine): **"This counter has a cash drawer and takes payment"**. The printer record already has a `has_cash_drawer` flag.
+- Per counter, on Admin → Terminals (set from the main machine): **"This counter has a cash drawer and takes payment"** (`terminals.takes_payment`, off by default). The printer record has its own `has_cash_drawer` flag: set it too if the drawer opens from the printer (needs QZ Tray on that PC). A drawer opened with a key works without it.
   - **Off** (Citizens flow): the counter prints the bill and the **main machine settles** it.
-  - **On**: F9 opens the payment box at the counter (cash / card / transfer / cheque / credit); the counter has its **own drawer session** (opening float, count, Z report) and opens its own drawer.
-- Either way the main machine can still settle any open bill (e.g. a customer who walks to the main cashier). Live Billing works in both.
-- The setting can only change when that counter has no open bill and no open drawer.
+  - **On**: F9 takes the payment at the counter (cash / card / transfer / cheque / credit); the counter has its **own drawer session** (opening float, count, Z report) and opens its own drawer. Issuing and settling are **one transaction**: a refused payment (no reference, over the credit limit) leaves no invoice number used and no stock reserved, and the bill stays on the screen.
+- Either way the main machine can still settle any open bill. On a drawer counter **"Send to main cashier"** prints the bill without taking payment (a customer who pays at the main cashier). The counter can also take payment for its own open bills from "Last invoices".
+- Live Billing works in both, and shows a drawer counter's holder and expected cash.
+- The setting can only change from the main machine, when that counter has no open bill (printed or in progress) and no open drawer.
+
+**Who can do what on a drawer counter** (anyone with `pos.sell`, so a Cashier too):
+
+| | Cashier on a drawer counter | Main machine only |
+|---|---|---|
+| Money | Settle **this counter's** bills; pay in, safe drop | Settle any bill; **pay out** (Owner / cashier authority, also at a counter) |
+| Drawer | Open, count, close; shift change to the next cashier | Handover to a Manager |
+| Corrections | none | **Voids, returns, customer payments**, discount approvals, credit-limit override |
+
+- **Blind count:** a Cashier does not see the expected cash of an open drawer (no tiles, no X report, no amount in error messages); the Z report shows it after the count. Owner and Manager do see it.
+- **Closing:** a counter's close is not held up by open bills (their money is not in this drawer); the main machine's close still is. **Shift change** closes with a handover slip; the next cashier opens with that count and the day's Z report covers both. A drawer left open is counted and closed by the **Owner**, at that counter.
+- **A void of a bill paid at a counter** refunds from the **main** drawer, because voids happen there. The counter's drawer still holds that money, so its count stays right.
+- Finance: all drawers post to the one Cash drawer account; each session opens from and closes to the safe, so the account comes back to zero as before. Expenses, supplier payments and payroll from "cash drawer" still mean the **main** drawer.
 
 ### 3.4 Roles
 
-`super_admin` (shown as **Owner**), `manager`, `cashier` (was Sales Staff). Done in H1. The person at the main machine settles with `pos.settle` (the Owner, or a Manager/Cashier through a handover, as in Citizens). A cashier on a drawer counter gets settle rights for **their own counter's bills only** (H3).
+`super_admin` (shown as **Owner**), `manager`, `cashier` (was Sales Staff). Done in H1. The person at the main machine settles with `pos.settle` (the Owner, or a Manager through a handover, as in Citizens). A cashier on a drawer counter settles **their own counter's bills only** (built in H3, see § 3.3).
 
 ### 3.5 Units and quantities
 
@@ -153,7 +169,7 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 | **H0** | Copy project, own identity (DB, prefixes, ports, cookies), tests green. *(done 2026-11-05)* |
 | **H1** | Hardware catalogue base: categories + code ranges, new units, English-only, roles (cashier), hardware demo data, logo + shop details. *(done 2026-11-05 except the logo and shop details, waiting for the owner's upload)* |
 | **H2** | **Barcodes**: column, product form/import/list, POS scan flow (scan → qty box), unknown-barcode linking, GRN/stocktake/returns scanning, sounds. *(done 2026-11-05)* |
-| **H3** | Per-counter payment (drawer counters settle their own bills) + counter drawer sessions. |
+| **H3** | Per-counter payment (drawer counters settle their own bills) + counter drawer sessions. *(done 2026-11-06)* |
 | **H4** | Prices: contractor list, customer special prices, bulk price change + history, discount limits. VAT invoices + VAT report. |
 | **H5** | Quotation maker. |
 | **H6** | Serial numbers + warranty + claims. |

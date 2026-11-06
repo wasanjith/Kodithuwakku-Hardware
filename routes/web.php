@@ -97,9 +97,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/barcodes', BarcodeLinkController::class)->middleware('throttle:60,1')->name('api.barcodes.link');
 
     /*
-    | Phase 3: POS. The counter screen works on every registered terminal; settlement,
-    | the drawer and handovers only on the main cashier terminal. "cashier" = the open
-    | drawer is held by you and you hold cashier authority.
+    | Phase 3: POS. The counter screen works on every registered terminal. Settlement and
+    | the drawer: on the main cashier terminal, and on a counter that takes payment (its own
+    | bills, its own drawer). Handovers, voids and returns only on the main cashier terminal.
+    | "cashier" = the open drawer of this terminal is held by you (and, at the main
+    | terminal, you hold cashier authority).
     */
     Route::middleware(['terminal', 'can:pos.sell'])->group(function () {
         Route::get('/pos', CounterController::class)->name('pos.counter');
@@ -112,6 +114,7 @@ Route::middleware('auth')->group(function () {
             Route::get('quick-items', [CartController::class, 'quickItems'])->name('quick-items');
 
             Route::post('invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+            Route::post('invoices/pay', [InvoiceController::class, 'pay'])->middleware(['terminal:counter', 'cashier'])->name('invoices.pay');
             Route::get('invoices/today', [InvoiceController::class, 'today'])->name('invoices.today');
             Route::post('sales/{sale}/reprint', [InvoiceController::class, 'reprint'])->name('sales.reprint');
 
@@ -143,20 +146,23 @@ Route::middleware('auth')->group(function () {
     });
     Route::get('/pos/sales/{sale}/invoice.pdf', [PrintController::class, 'invoicePdf'])->name('pos.sales.invoice-pdf');
 
-    Route::middleware('terminal:main_cashier')->prefix('pos')->name('pos.')->group(function () {
+    Route::middleware('terminal:drawer')->prefix('pos')->name('pos.')->group(function () {
         Route::get('drawer', [DrawerController::class, 'show'])->name('drawer.show');
         Route::get('drawer/open', [DrawerController::class, 'create'])->name('drawer.open');
         Route::post('drawer/open', [DrawerController::class, 'store'])->name('drawer.store');
         Route::get('drawer/close', [DrawerController::class, 'closeForm'])->name('drawer.close');
         Route::post('drawer/close', [DrawerController::class, 'close'])->name('drawer.close.store');
+        Route::post('drawer/movements', [DrawerController::class, 'movement'])->middleware('cashier')->name('drawer.movements.store');
 
         Route::get('handover/return', [HandoverController::class, 'returnForm'])->name('handover.return');
         Route::post('handover/return', [HandoverController::class, 'returnStore'])->name('handover.return.store');
+    });
+
+    Route::middleware('terminal:main_cashier')->prefix('pos')->name('pos.')->group(function () {
         Route::get('authority-ended', [HandoverController::class, 'authorityEnded'])->name('authority-ended');
 
         Route::middleware('cashier')->group(function () {
             Route::get('cashier', [CashierController::class, 'index'])->name('cashier');
-            Route::post('drawer/movements', [DrawerController::class, 'movement'])->middleware('can:drawer.manage')->name('drawer.movements.store');
             Route::get('handover', [HandoverController::class, 'create'])->middleware('can:drawer.handover')->name('handover.create');
             Route::post('handover', [HandoverController::class, 'store'])->middleware('can:drawer.handover')->name('handover.store');
             Route::post('sales/{sale}/void', [CashierController::class, 'void'])->middleware('can:pos.void')->name('sales.void');
@@ -176,8 +182,9 @@ Route::middleware('auth')->group(function () {
         });
     });
 
+    Route::post('/api/pos/sales/{sale}/settle', [CashierController::class, 'settle'])->middleware(['terminal', 'cashier'])->name('api.pos.sales.settle');
+
     Route::middleware(['terminal:main_cashier', 'cashier'])->prefix('api/pos')->name('api.pos.')->group(function () {
-        Route::post('sales/{sale}/settle', [CashierController::class, 'settle'])->name('sales.settle');
         Route::get('sales/find', [CashierController::class, 'find'])->name('sales.find');
         Route::post('approvals/{approvalRequest}/approve', [ApprovalController::class, 'approve'])->middleware('can:pos.approve_requests')->name('approvals.approve');
         Route::post('approvals/{approvalRequest}/reject', [ApprovalController::class, 'reject'])->middleware('can:pos.approve_requests')->name('approvals.reject');

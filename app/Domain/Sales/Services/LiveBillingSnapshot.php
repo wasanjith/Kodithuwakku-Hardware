@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sales\Services;
 
+use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\CashDrawer\Services\DrawerCalculator;
 use App\Domain\Identity\Enums\TerminalType;
 use App\Domain\Identity\Models\Terminal;
@@ -71,7 +72,14 @@ class LiveBillingSnapshot
             ->get()
             ->groupBy('terminal_id');
 
-        $columns = $terminals->map(fn (Terminal $terminal) => $this->column($terminal, $waiting->get($terminal->id, collect()), $today[$terminal->id] ?? null, $events->get($terminal->id, collect())));
+        $counterDrawers = DrawerSession::query()
+            ->open()
+            ->with('holder')
+            ->whereIn('terminal_id', $terminals->filter(fn (Terminal $terminal) => $terminal->takesPayment())->pluck('id'))
+            ->get()
+            ->keyBy('terminal_id');
+
+        $columns = $terminals->map(fn (Terminal $terminal) => $this->column($terminal, $waiting->get($terminal->id, collect()), $today[$terminal->id] ?? null, $events->get($terminal->id, collect()), $counterDrawers->get($terminal->id)));
 
         $session = $this->authority->openSession();
 
@@ -105,7 +113,7 @@ class LiveBillingSnapshot
      * @param  Collection<int, CounterEvent>  $events
      * @return array<string, mixed>
      */
-    private function column(Terminal $terminal, Collection $waiting, ?object $today, Collection $events): array
+    private function column(Terminal $terminal, Collection $waiting, ?object $today, Collection $events, ?DrawerSession $drawer = null): array
     {
         $cart = $this->carts->get($terminal->id);
         $beat = $this->carts->heartbeat($terminal->id);
@@ -126,6 +134,8 @@ class LiveBillingSnapshot
             'counter_no' => $terminal->counter_no,
             'name' => $terminal->displayName(),
             'code' => $terminal->code,
+            'takes_payment' => $terminal->takesPayment(),
+            'drawer' => $drawer !== null ? ['holder' => $drawer->holder->name, 'expected' => (string) $this->calculator->expectedCash($drawer)] : null,
             'online' => $online,
             'user' => $beat['user'] ?? ($cart['user']['name'] ?? null),
             'status' => $status,

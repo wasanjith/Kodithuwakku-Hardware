@@ -3,6 +3,12 @@
 @section('title', $terminal->displayName())
 @section('pos-main-class', 'overflow-hidden')
 
+@if ($config['takes_payment'])
+    @push('head')
+        @vite('resources/js/printing/drawer.js')
+    @endpush
+@endif
+
 @section('content')
 <div
     x-data="posCounter(@js($config))"
@@ -18,7 +24,7 @@
     <span class="hidden" x-hotkey.f8="hold()"></span>
     <span class="hidden" x-hotkey.f9="print()"></span>
     <span class="hidden" x-hotkey.f10="reprintLast()"></span>
-    <span class="hidden" x-hotkey.escape="unknown ? closeUnknown() : showInvoices || showHolds || showCustomer || showQuotations ? (showInvoices = showHolds = showCustomer = showQuotations = false, focusSearch()) : (query ? (query = '', results = []) : clearCart())"></span>
+    <span class="hidden" x-hotkey.escape="paying ? closePay() : unknown ? closeUnknown() : showInvoices || showHolds || showCustomer || showQuotations ? (showInvoices = showHolds = showCustomer = showQuotations = false, focusSearch()) : (query ? (query = '', results = []) : clearCart())"></span>
 
     {{-- ============================== Left: search and quick grids ============================== --}}
     <section class="flex min-h-0 flex-col rounded-lg bg-white shadow-sm ring-1 ring-gray-200 lg:col-span-5">
@@ -113,6 +119,13 @@
     <section class="flex min-h-0 flex-col gap-3 lg:col-span-7">
         {{-- Messages --}}
         <div class="space-y-2" aria-live="polite">
+            @if ($config['takes_payment'])
+                <div x-show="!config.drawer.mine" x-cloak class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-300" role="alert">
+                    <span x-text="config.drawer.open ? `The drawer of this counter is held by ${config.drawer.holder}. They count and close it first; until then bills can only go to the main cashier.` : 'The drawer of this counter is not open. Open it to take payment here.'"></span>
+                    <x-ui.button size="sm" :href="route('pos.drawer.show')" x-show="config.drawer.open">Drawer</x-ui.button>
+                    <x-ui.button size="sm" :href="route('pos.drawer.open')" x-show="!config.drawer.open">Open drawer</x-ui.button>
+                </div>
+            @endif
             <template x-for="item in voidRestores" :key="item.sale_id">
                 <div class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-200">
                     <span>Invoice <strong x-text="item.invoice_no"></strong> (Rs. <span x-text="money(item.total)"></span>) was voided<span x-text="item.reason ? ': ' + item.reason : ''"></span>. Restore the bill?</span>
@@ -135,12 +148,15 @@
                 <button type="button" @click="notice = null" class="leading-none" aria-label="Dismiss">&times;</button>
             </div>
             <div x-show="printed && cart.lines.length === 0" x-cloak class="rounded-md bg-brand-50 p-3 ring-1 ring-brand-200">
-                <p class="text-sm text-brand-800">Printed <strong x-text="printed?.invoice_no"></strong>. Take the invoice and the money to the cashier.</p>
+                <p class="text-sm text-brand-800">
+                    <span x-show="printed?.paid_here">Paid and printed <strong x-text="printed?.invoice_no"></strong>. <span x-show="printed?.payment_method === 'cash'">Give the balance back.</span></span>
+                    <span x-show="!printed?.paid_here">Printed <strong x-text="printed?.invoice_no"></strong>. Take the invoice and the money to the cashier.</span>
+                </p>
                 <div class="mt-1 flex flex-wrap items-baseline gap-x-6 text-brand-900">
                     <span>Total <strong class="text-xl tabular" x-text="money(printed?.total)"></strong></span>
                     <span x-show="printed?.payment_method === 'cash'">Paid <strong class="text-xl tabular" x-text="money(printed?.tendered)"></strong></span>
                     <span x-show="printed?.payment_method === 'cash'">Balance <strong class="text-3xl tabular" x-text="money(printed?.change_due)"></strong></span>
-                    <span x-show="printed?.payment_method !== 'cash'" x-text="printed?.payment_method_label + ': confirm at the cashier'"></span>
+                    <span x-show="printed?.payment_method !== 'cash'" x-text="printed?.payment_method_label + (printed?.paid_here ? '' : ': confirm at the cashier')"></span>
                 </div>
             </div>
         </div>
@@ -268,20 +284,25 @@
                 <template x-for="method in Object.keys(config.methods)" :key="method">
                     <button type="button" @click="setMethod(method)" :class="cart.payment_method === method ? 'bg-brand-600 text-white' : (method === 'credit' && !cart.customer_id ? 'bg-gray-50 text-gray-400' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')" class="rounded-md px-3 py-1.5 text-sm font-medium" x-text="config.methods[method]" :title="method === 'credit' && !cart.customer_id ? 'Choose the customer first (F4)' : ''"></button>
                 </template>
-                <span x-show="!isCash && !isCredit" x-cloak class="text-xs text-amber-700">Confirm the reference at the cashier.</span>
+                <span x-show="!isCash && !isCredit && !config.takes_payment" x-cloak class="text-xs text-amber-700">Confirm the reference at the cashier.</span>
+            </div>
+
+            <div x-show="needsReference" x-cloak class="mt-3">
+                <label for="payment-reference" class="text-xs font-medium text-gray-600">Reference (slip / transfer / cheque no.)</label>
+                <input id="payment-reference" x-ref="reference" x-model="paymentReference" @keydown.enter.prevent="print()" data-barcode-field type="text" autocomplete="off" maxlength="100" class="mt-1 block w-full rounded-md border-gray-300 py-2 focus:border-brand-500 focus:ring-brand-500 sm:w-80">
             </div>
 
             <div x-show="isCredit" x-cloak class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md bg-violet-50 px-4 py-3 text-violet-900 ring-1 ring-violet-200">
                 <div class="text-sm">
                     <p class="font-semibold">Credit sale</p>
                     <p x-show="customer" x-text="customer ? customer.name + ' · ' + (customer.phone ?? '') : ''"></p>
-                    <p class="text-xs">The invoice prints marked CREDIT. The cashier checks the credit limit.</p>
+                    <p class="text-xs" x-text="config.takes_payment ? 'The invoice prints marked CREDIT, with a credit bill for the customer\'s signature.' : 'The invoice prints marked CREDIT. The cashier checks the credit limit.'"></p>
                 </div>
                 <dl x-show="customer && customer.credit_limit !== undefined" class="grid grid-cols-2 gap-x-3 text-sm">
                     <dt>Owes now</dt><dd class="text-right tabular" x-text="money(customer?.balance)"></dd>
                     <dt>Available</dt><dd class="text-right font-semibold tabular" :class="Number(customer?.available_credit) < total ? 'text-red-700' : ''" x-text="money(customer?.available_credit)"></dd>
                 </dl>
-                <p x-show="customer && Number(customer.available_credit) < total" class="w-full text-xs font-semibold text-red-700">This bill is over the customer's credit limit. Only the owner can allow it at the cashier.</p>
+                <p x-show="customer && Number(customer.available_credit) < total" class="w-full text-xs font-semibold text-red-700">This bill is over the customer's credit limit. Only the owner can allow it at the main cashier.</p>
             </div>
 
             <div x-show="isCash" class="mt-3 grid gap-3 sm:grid-cols-3">
@@ -308,9 +329,10 @@
                     <x-ui.button variant="secondary" @click="openInvoices()">Last invoices</x-ui.button>
                     <x-ui.button variant="secondary" @click="reprintLast()" x-show="config.can_reprint">Reprint last (F10)</x-ui.button>
                     <x-ui.button variant="ghost" @click="clearCart()">Clear (Esc)</x-ui.button>
+                    <x-ui.button variant="secondary" @click="print(true)" x-show="config.takes_payment" x-bind:disabled="printing" title="The customer pays at the main cashier">Send to main cashier</x-ui.button>
                 </div>
                 <button type="button" @click="print()" :disabled="printing" :class="blocked ? 'bg-gray-300 text-gray-600' : 'bg-brand-600 text-white hover:bg-brand-700'" class="shrink-0 rounded-lg px-8 py-4 text-xl font-bold shadow-sm disabled:opacity-60" :title="blocked ?? ''">
-                    <span x-show="!printing">Print invoice (F9)</span>
+                    <span x-show="!printing" x-text="config.takes_payment ? 'Pay and print (F9)' : 'Print invoice (F9)'"></span>
                     <span x-show="printing" x-cloak>Printing…</span>
                 </button>
             </div>
@@ -335,6 +357,7 @@
                         <div class="flex items-center gap-2">
                             <span class="font-semibold tabular" x-text="money(sale.total)"></span>
                             <span class="rounded px-1.5 py-0.5 text-xs" :class="{ 'bg-amber-100 text-amber-900': sale.status === 'invoiced', 'bg-brand-100 text-brand-800': sale.status === 'settled', 'bg-red-100 text-red-800': sale.status === 'void' }" x-text="sale.status_label"></span>
+                            <x-ui.button size="sm" @click="openPay(sale)" x-show="config.takes_payment && sale.status === 'invoiced'">Take payment</x-ui.button>
                             <x-ui.button size="sm" variant="secondary" @click="reprint(sale)" x-show="config.can_reprint && sale.status !== 'void'">Reprint</x-ui.button>
                         </div>
                     </li>
@@ -459,6 +482,44 @@
             </ul>
         </div>
     </div>
+
+    {{-- ============================== Open bill of this counter: take the payment here ============================== --}}
+    <template x-if="paying">
+        <div class="fixed inset-0 z-50 flex items-start justify-center bg-gray-900/50 p-4">
+            <form @submit.prevent="payOpenBill()" class="mt-12 w-full max-w-md rounded-lg bg-white shadow-xl" role="dialog" aria-labelledby="pay-open-bill-title">
+                <header class="border-b border-gray-200 px-5 py-4">
+                    <h2 id="pay-open-bill-title" class="text-lg font-semibold">Take payment for <span x-text="paying.sale.invoice_no"></span></h2>
+                    <p class="text-sm text-gray-500"><span x-text="paying.sale.staff"></span><span x-show="paying.sale.customer" x-text="' · ' + (paying.sale.customer?.name ?? '')"></span></p>
+                </header>
+                <div class="space-y-3 px-5 py-4">
+                    <dl class="grid grid-cols-2 gap-y-1 text-base">
+                        <dt>Total</dt><dd class="text-right text-2xl font-bold tabular" x-text="money(paying.sale.total)"></dd>
+                        <template x-if="paying.method === 'cash' && paying.sale.tendered !== null"><dt>Tendered</dt></template>
+                        <template x-if="paying.method === 'cash' && paying.sale.tendered !== null"><dd class="text-right tabular" x-text="money(paying.sale.tendered)"></dd></template>
+                        <template x-if="paying.method === 'cash' && paying.sale.tendered !== null"><dt class="font-semibold">Give back (balance)</dt></template>
+                        <template x-if="paying.method === 'cash' && paying.sale.tendered !== null"><dd class="text-right text-2xl font-bold tabular text-brand-700" x-text="money(paying.sale.change_due)"></dd></template>
+                    </dl>
+                    <div>
+                        <label for="pay-open-bill-method" class="block text-sm font-medium text-gray-700">Payment method</label>
+                        <select id="pay-open-bill-method" x-model="paying.method" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                            <template x-for="method in Object.keys(config.methods)" :key="method">
+                                <option :value="method" :selected="method === paying.method" :disabled="method === 'credit' && !paying.sale.customer_id" x-text="config.methods[method]"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="payingNeedsReference">
+                        <label for="pay-open-bill-reference" class="block text-sm font-medium text-gray-700">Reference (slip / transfer / cheque no.)</label>
+                        <input id="pay-open-bill-reference" x-model="paying.reference" data-barcode-field maxlength="100" autocomplete="off" class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                    </div>
+                    <p x-show="paying.error" class="text-sm text-red-700" x-text="paying.error"></p>
+                </div>
+                <footer class="flex justify-end gap-2 rounded-b-lg border-t border-gray-200 bg-gray-50 px-5 py-3">
+                    <x-ui.button variant="secondary" @click="closePay()">Cancel (Esc)</x-ui.button>
+                    <x-ui.button type="submit" id="pay-open-bill-confirm" x-bind:disabled="paying.busy">Take payment (Enter)</x-ui.button>
+                </footer>
+            </form>
+        </div>
+    </template>
 
     {{-- ============================== Unknown barcode ============================== --}}
     <template x-if="unknown">

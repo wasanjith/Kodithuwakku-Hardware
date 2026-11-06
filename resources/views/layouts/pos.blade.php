@@ -2,11 +2,15 @@
 @php
     $posTerminal = app(\App\Domain\Identity\Support\CurrentTerminal::class)->get();
     $posUser = auth()->user();
-    $posHolder = app(\App\Domain\Identity\Services\CashierAuthority::class)->holder();
+    // A counter that takes payment shows its own drawer, not the main cashier's authority.
+    $posOwnDrawer = $posTerminal?->takesPayment() ?? false;
+    $posHolder = $posOwnDrawer
+        ? \App\Domain\CashDrawer\Models\DrawerSession::query()->where('terminal_id', $posTerminal->id)->open()->with('holder')->first()?->holder
+        : app(\App\Domain\Identity\Services\CashierAuthority::class)->holder();
     $navItems = array_filter([
         $posUser?->can('pos.sell') && $posTerminal ? ['label' => 'Billing', 'route' => 'pos.counter', 'active' => 'pos.counter'] : null,
         $posTerminal?->isMainCashier() && $posUser?->canAny(['pos.settle', 'drawer.manage', 'drawer.handover']) ? ['label' => 'Cashier', 'route' => 'pos.cashier', 'active' => 'pos.cashier'] : null,
-        $posTerminal?->isMainCashier() ? ['label' => 'Drawer', 'route' => 'pos.drawer.show', 'active' => 'pos.drawer.*'] : null,
+        $posTerminal?->hasOwnDrawer() ? ['label' => 'Drawer', 'route' => 'pos.drawer.show', 'active' => 'pos.drawer.*'] : null,
         ['label' => 'Back office', 'route' => 'dashboard', 'active' => 'dashboard'],
     ]);
 @endphp
@@ -37,7 +41,9 @@
             </div>
             <div class="flex items-center gap-3">
                 @yield('pos-status')
-                @if ($posHolder)
+                @if ($posOwnDrawer)
+                    <span class="hidden text-xs text-brand-100 md:inline" title="This counter's cash drawer">Drawer: <span class="font-semibold text-white">{{ $posHolder?->name ?? 'closed' }}</span></span>
+                @elseif ($posHolder)
                     <span class="hidden text-xs text-brand-100 md:inline" title="Cashier authority">Cashier: <span class="font-semibold text-white" data-cashier-holder>{{ $posHolder->name }}</span></span>
                 @endif
                 <span class="font-medium">{{ $posUser?->name }}</span>

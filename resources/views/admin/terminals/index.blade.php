@@ -37,6 +37,9 @@
                     <x-ui.badge :color="$terminal->isMainCashier() ? 'purple' : 'blue'">
                         {{ $terminal->isCounter() ? 'Counter '.$terminal->counter_no : $terminal->type->label() }}
                     </x-ui.badge>
+                    @if ($terminal->takesPayment())
+                        <x-ui.badge color="amber">Takes payment</x-ui.badge>
+                    @endif
                 </td>
                 <td class="text-gray-600">
                     @if ($terminal->printer)

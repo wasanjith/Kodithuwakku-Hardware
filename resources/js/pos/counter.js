@@ -76,6 +76,12 @@ export default function posCounter(config) {
         scanning: false,
         unknown: null,
 
+        // A counter that takes payment: the card / transfer / cheque number of this bill, and
+        // an open bill of this counter being paid from "Last invoices"
+        // { sale, method, reference, key, busy, error }
+        paymentReference: '',
+        paying: null,
+
         init() {
             this.cart = this.emptyCart();
             this.restore();
@@ -319,8 +325,8 @@ export default function posCounter(config) {
          */
         onScan(detail) {
             // Not while a panel is open, and never into the amount tendered.
-            if (this.showInvoices || this.showHolds || this.showCustomer || this.showQuotations || this.unknown) return;
-            if (detail.target === this.$refs.tendered) return;
+            if (this.showInvoices || this.showHolds || this.showCustomer || this.showQuotations || this.unknown || this.paying) return;
+            if (detail.target === this.$refs.tendered || detail.target === this.$refs.reference) return;
 
             detail.handled = true;
             let term = detail.code;
@@ -667,12 +673,31 @@ export default function posCounter(config) {
             return Number(this.cart.bill_discount || 0) > 0 && this.overLimit(this.billPercent) && !this.cart.bill_approval_request_id;
         },
 
-        get blocked() {
+        /** What stops this bill from being printed at all. */
+        get billBlocked() {
             if (this.cart.lines.length === 0) return 'Add items to the bill.';
             if (this.cart.lines.some((line) => this.lineNeedsApproval(line)) || this.billNeedsApproval) return 'A discount is waiting for the cashier\'s approval.';
             if (this.isCredit && !this.cart.customer_id) return 'Choose the customer (F4) for a credit sale.';
             if (this.isCash && (this.tendered === null || this.tendered + 0.001 < this.total)) return 'Enter the amount tendered (F6).';
             return null;
+        },
+
+        get needsReference() {
+            return this.config.takes_payment && this.config.reference_methods.includes(this.cart.payment_method);
+        },
+
+        /** What stops this counter from taking the payment itself (it can still send the bill to the main cashier). */
+        get payBlocked() {
+            if (!this.config.takes_payment) return null;
+            if (!this.config.drawer.mine) {
+                return this.config.drawer.open ? `The drawer is held by ${this.config.drawer.holder}.` : 'Open the cash drawer first.';
+            }
+            if (this.needsReference && this.paymentReference.trim() === '') return `Enter the ${this.config.methods[this.cart.payment_method]} reference.`;
+            return null;
+        },
+
+        get blocked() {
+            return this.billBlocked ?? this.payBlocked;
         },
 
         quickAmounts() {
@@ -746,6 +771,7 @@ export default function posCounter(config) {
             this.customer = null;
             this.selected = -1;
             this.tender = false;
+            this.paymentReference = '';
             this.changed();
             // The next bill starts with a new id once the cleared state is synced.
             setTimeout(() => {
@@ -813,13 +839,22 @@ export default function posCounter(config) {
 
         // ------------------------------------------------------------------ print (F9)
 
-        async print() {
-            if (this.printing) return;
-            if (this.blocked) {
-                this.error = this.blocked;
+        /**
+         * F9. A counter that takes payment settles the bill here in one step (toMain = true
+         * prints it for the main cashier instead); any other counter prints it for the main cashier.
+         */
+        async print(toMain = false) {
+            if (this.printing || this.paying) return;
+            const blocked = toMain ? this.billBlocked : this.blocked;
+            if (blocked) {
+                this.error = blocked;
                 if (this.isCash && this.tendered === null) this.openTender();
+                else if (!toMain && this.needsReference) this.$refs.reference?.focus();
                 return;
             }
+
+            const pay = this.config.takes_payment && !toMain;
+            let refocus = true;
 
             this.printing = true;
             this.error = null;
@@ -827,20 +862,28 @@ export default function posCounter(config) {
             clearTimeout(this.syncTimer);
 
             try {
-                const data = await api(this.config.urls.issue, { method: 'POST', body: { ...this.payload(), idempotency_key: this.issueKey } });
+                const data = await api(pay ? this.config.urls.pay : this.config.urls.issue, {
+                    method: 'POST',
+                    body: { ...this.payload(), ...(pay ? { reference: this.paymentReference.trim() || null } : {}), idempotency_key: this.issueKey },
+                });
                 const sale = data.sale;
 
-                this.printed = sale;
+                this.printed = { ...sale, paid_here: pay };
                 this.cart = this.emptyCart();
                 this.customer = null;
                 this.server = null;
                 this.selected = -1;
                 this.tender = false;
                 this.issueKey = null;
+                this.paymentReference = '';
                 this.refreshInvoices();
 
+                if (pay && data.open_drawer) this.openCashDrawer();
+
                 if (data.print_url) {
-                    this.checkPrint(data.print_url, sale);
+                    this.checkPrint(data.print_url, sale).then(() => pay && this.printCreditBill(data, sale));
+                } else if (pay) {
+                    this.printCreditBill(data, sale);
                 }
 
                 if (this.config.can_settle && this.config.urls.cashier) {
@@ -848,9 +891,20 @@ export default function posCounter(config) {
                 }
             } catch (error) {
                 this.error = error instanceof ApiError ? error.first : error.message;
+                if (pay) {
+                    // Refused: nothing was issued. The server dropped its copy of the cart with the rollback.
+                    this.changed();
+                    if (error instanceof ApiError && error.status === 409) {
+                        this.config.drawer = { open: false, mine: false, holder: null };
+                    }
+                    if (error instanceof ApiError && error.errors?.reference) {
+                        refocus = false;
+                        this.$nextTick(() => this.$refs.reference?.focus());
+                    }
+                }
             } finally {
                 this.printing = false;
-                this.focusSearch();
+                if (refocus) this.focusSearch();
             }
         },
 
@@ -859,6 +913,68 @@ export default function posCounter(config) {
             const ok = await printPage(url);
             if (!ok) {
                 this.printWarning = { sale, message: `Check printer: ${sale.invoice_no} was not confirmed as printed.` };
+            }
+        },
+
+        /** Cash was taken: open this counter's drawer. A drawer opened with a key is not an error. */
+        async openCashDrawer() {
+            if (!this.config.has_drawer) return;
+            try {
+                await window.PosPrinting?.openCashDrawer(this.config.printer || undefined);
+            } catch {
+                // QZ Tray is not running or the drawer is manual: the cashier opens it with the key.
+            }
+        },
+
+        async printCreditBill(data, sale) {
+            if (!data.credit_bill_url) return;
+            this.notice = `${sale.invoice_no} put on ${sale.customer?.name ?? 'the customer'}'s account. The credit bill is printing: get the customer's signature.`;
+            const ok = await printPage(data.credit_bill_url);
+            if (!ok) this.error = `Check printer: the credit bill of ${sale.invoice_no} was not confirmed as printed.`;
+        },
+
+        // ------------------------------------------------------------------ paying an open bill of this counter
+
+        openPay(sale) {
+            if (!this.config.takes_payment) return;
+            this.error = null;
+            this.showInvoices = false;
+            this.paying = { sale, method: sale.payment_method, reference: '', key: randomKey(), busy: false, error: null };
+            this.$nextTick(() => document.getElementById('pay-open-bill-confirm')?.focus());
+        },
+
+        closePay() {
+            this.paying = null;
+            this.focusSearch();
+        },
+
+        get payingNeedsReference() {
+            return this.paying !== null && this.config.reference_methods.includes(this.paying.method);
+        },
+
+        async payOpenBill() {
+            const paying = this.paying;
+            if (!paying || paying.busy) return;
+            paying.busy = true;
+            paying.error = null;
+
+            try {
+                const data = await api(this.config.urls.settle.replace('__ID__', paying.sale.id), {
+                    method: 'POST',
+                    body: { method: paying.method, reference: paying.reference.trim() || null, idempotency_key: paying.key },
+                });
+                this.paying = null;
+                this.notice = `${paying.sale.invoice_no} paid here.`;
+                if (data.open_drawer) this.openCashDrawer();
+                this.printCreditBill(data, paying.sale);
+                this.refreshInvoices();
+                this.focusSearch();
+            } catch (error) {
+                paying.busy = false;
+                paying.error = error instanceof ApiError ? error.first : error.message;
+                if (error instanceof ApiError && error.status === 409) {
+                    this.config.drawer = { open: false, mine: false, holder: null };
+                }
             }
         },
 

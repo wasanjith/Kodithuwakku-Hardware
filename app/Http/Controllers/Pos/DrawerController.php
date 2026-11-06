@@ -26,8 +26,11 @@ use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
 
 /**
- * The cash drawer of the main cashier: open with a float, pay in / out / safe drop,
- * end-of-day count with the Z report.
+ * The cash drawer of this terminal (the main cashier, or a counter that takes payment):
+ * open with a float, pay in / out / safe drop, end-of-day count with the Z report.
+ *
+ * A counter cashier's count is blind: they do not see what the drawer should hold until
+ * they have counted it (the Z report shows it then).
  */
 class DrawerController extends Controller
 {
@@ -44,16 +47,28 @@ class DrawerController extends Controller
         $terminal = $this->currentTerminal->get();
         $session = DrawerSession::query()->where('terminal_id', $terminal->id)->open()->with(['holder', 'cashMovements.user'])->first();
         $user = $request->user();
+        $canRun = $terminal->canRunDrawer($user);
 
-        abort_unless($session === null || $session->holder_user_id === $user->id || $user->canAny(['drawer.handover', 'drawer.manage']), 403);
+        abort_unless($session === null || $session->holder_user_id === $user->id || $canRun || $user->canAny(['drawer.handover', 'drawer.manage']), 403);
+
+        $showFigures = $terminal->isMainCashier() || $user->canAny(['drawer.handover', 'drawer.manage', 'reports.sales']);
 
         return view('pos.drawer.show', [
             'terminal' => $terminal,
             'session' => $session,
             'summary' => $session !== null ? $this->calculator->summary($session) : null,
             'isHolder' => $session?->holder_user_id === $user->id,
-            'movementTypes' => CashMovementType::drawerOptions(),
-            'recent' => DrawerSession::query()->where('terminal_id', $terminal->id)->whereNotNull('closed_at')->with('holder')->latest('closed_at')->limit(5)->get(),
+            'canRun' => $canRun,
+            'showFigures' => $showFigures,
+            'movementTypes' => $this->movementTypes($request),
+            'recent' => DrawerSession::query()
+                ->where('terminal_id', $terminal->id)
+                ->whereNotNull('closed_at')
+                ->when(! $showFigures, fn ($query) => $query->where('holder_user_id', $user->id))
+                ->with('holder')
+                ->latest('closed_at')
+                ->limit(5)
+                ->get(),
         ]);
     }
 
@@ -80,9 +95,10 @@ class DrawerController extends Controller
     {
         $this->authorizeDrawer($request);
 
-        $session = $open->handle($this->currentTerminal->get(), $request->user(), $request->denominations());
+        $terminal = $this->currentTerminal->get();
+        $session = $open->handle($terminal, $request->user(), $request->denominations());
 
-        return redirect()->route('pos.cashier')->with('success', 'Drawer opened with Rs. '.number_format((float) $session->opening_float, 2).'.');
+        return redirect()->route($terminal->isMainCashier() ? 'pos.cashier' : 'pos.counter')->with('success', 'Drawer opened with Rs. '.number_format((float) $session->opening_float, 2).'.');
     }
 
     /**
@@ -90,8 +106,10 @@ class DrawerController extends Controller
      */
     public function movement(Request $request, RecordCashMovementAction $record): RedirectResponse
     {
+        $this->authorizeDrawer($request);
+
         $validated = $request->validate([
-            'type' => ['required', Rule::in(array_keys(CashMovementType::drawerOptions()))],
+            'type' => ['required', Rule::in(array_keys($this->movementTypes($request)))],
             'amount' => ['required', 'numeric', 'gt:0', 'max:99999999'],
             'reason' => ['required', 'string', 'max:255'],
         ]);
@@ -114,23 +132,37 @@ class DrawerController extends Controller
     public function closeForm(Request $request): View|RedirectResponse
     {
         $session = $this->ownOpenSession($request);
+        $terminal = $this->currentTerminal->get();
 
         return view('pos.drawer.close', [
+            'terminal' => $terminal,
             'session' => $session->load('holder'),
             'denominations' => DrawerCalculator::DENOMINATIONS,
-            'waiting' => Sale::query()->with('invoicedTerminal')->where('status', SaleStatus::Invoiced)->orderBy('invoice_no')->get(),
+            'waiting' => Sale::query()
+                ->with('invoicedTerminal')
+                ->where('status', SaleStatus::Invoiced)
+                ->when(! $terminal->isMainCashier(), fn ($query) => $query->where('invoiced_terminal_id', $terminal->id))
+                ->orderBy('invoice_no')
+                ->get(),
         ]);
     }
 
     public function close(DrawerCountRequest $request, CloseDrawerAction $close): RedirectResponse
     {
         $session = $this->ownOpenSession($request);
-        $note = $request->validate(['note' => ['nullable', 'string', 'max:255']])['note'] ?? null;
+        $validated = $request->validate([
+            'note' => ['nullable', 'string', 'max:255'],
+            'shift_change' => ['nullable', 'boolean'],
+        ]);
 
-        $closed = $close->handle($session, $request->user(), $request->denominations(), DrawerCloseReason::EndOfDay, $note);
+        // A counter's shift change: the next cashier opens with this count, on the same day's Z report.
+        $shiftChange = (bool) ($validated['shift_change'] ?? false) && ! $this->currentTerminal->get()->isMainCashier();
+        $reason = $shiftChange ? DrawerCloseReason::Handover : DrawerCloseReason::EndOfDay;
+
+        $closed = $close->handle($session, $request->user(), $request->denominations(), $reason, $validated['note'] ?? null);
 
         return redirect()->route('pos.drawer.report', ['drawerSession' => $closed, 'print' => 1])
-            ->with('success', 'Day closed. Variance Rs. '.number_format((float) $closed->variance, 2).'.');
+            ->with('success', ($shiftChange ? 'Drawer closed for the next cashier.' : 'Day closed.').' Variance Rs. '.number_format((float) $closed->variance, 2).'.');
     }
 
     /**
@@ -185,7 +217,24 @@ class DrawerController extends Controller
 
     private function authorizeDrawer(Request $request): void
     {
-        abort_unless($request->user()->can('drawer.manage'), 403, 'You do not hold cashier authority.');
+        abort_unless($this->currentTerminal->get()->canRunDrawer($request->user()), 403, 'You do not hold cashier authority.');
+    }
+
+    /**
+     * What this user may record on this drawer. A pay out is cash the owner takes for
+     * themselves, so at a counter it stays with cashier authority.
+     *
+     * @return array<string, string>
+     */
+    private function movementTypes(Request $request): array
+    {
+        $types = CashMovementType::drawerOptions();
+
+        if (! $this->currentTerminal->get()->isMainCashier() && ! $request->user()->can('drawer.manage')) {
+            unset($types[CashMovementType::PayOut->value]);
+        }
+
+        return $types;
     }
 
     private function ownOpenSession(Request $request): DrawerSession
@@ -194,7 +243,7 @@ class DrawerController extends Controller
 
         abort_if($session === null, 404, 'No drawer is open on this terminal.');
         abort_unless($session->holder_user_id === $request->user()->id, 403, 'Only the drawer holder can close the day.');
-        abort_unless($request->user()->can('drawer.manage'), 403, 'Cashier authority ended: use "Count and hand back" instead.');
+        abort_unless($this->currentTerminal->get()->canRunDrawer($request->user()), 403, 'Cashier authority ended: use "Count and hand back" instead.');
 
         return $session;
     }

@@ -38,7 +38,10 @@ class RecordCashMovementAction
             }
 
             if ($type->sign() < 0 && $value->isGreaterThan($this->calculator->expectedCash($session))) {
-                throw ValidationException::withMessages(['amount' => 'The drawer does not hold that much cash (expected Rs. '.Money::format($this->calculator->expectedCash($session)).').']);
+                // A counter cashier's count is blind, so this message does not name the amount.
+                $expected = $user->can('drawer.manage') ? ' (expected Rs. '.Money::format($this->calculator->expectedCash($session)).')' : '';
+
+                throw ValidationException::withMessages(['amount' => "The drawer does not hold that much cash{$expected}."]);
             }
 
             $movement = CashMovement::create([

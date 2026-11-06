@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Domain\CashDrawer\Models\DrawerSession;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
@@ -15,7 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * GET /pos: the full-screen counter billing screen (Counters 1–3 and the main terminal).
+ * GET /pos: the full-screen counter billing screen (the counters and the main terminal).
  */
 class CounterController extends Controller
 {
@@ -24,10 +25,22 @@ class CounterController extends Controller
         $terminal = $currentTerminal->get();
         $user = $request->user();
         $max = $limits->maxPercentFor($user);
+        $terminal->loadMissing('printer');
+        $drawer = $terminal->takesPayment() ? DrawerSession::query()->where('terminal_id', $terminal->id)->open()->with('holder')->first() : null;
 
         return view('pos.counter', [
-            'terminal' => $terminal->loadMissing('printer'),
+            'terminal' => $terminal,
             'config' => [
+                // A counter with its own drawer takes the payment itself (F9 settles at once).
+                'takes_payment' => $terminal->takesPayment(),
+                'drawer' => [
+                    'open' => $drawer !== null,
+                    'mine' => $drawer?->holder_user_id === $user->id,
+                    'holder' => $drawer?->holder->name,
+                ],
+                'printer' => $terminal->printer?->windows_name,
+                'has_drawer' => (bool) $terminal->printer?->has_cash_drawer,
+                'reference_methods' => collect(PaymentMethod::counterMethods())->filter(fn (PaymentMethod $method) => $method->needsReference())->map(fn (PaymentMethod $method) => $method->value)->values()->all(),
                 'terminal' => ['id' => $terminal->id, 'name' => $terminal->displayName(), 'is_main' => $terminal->isMainCashier(), 'counter_no' => $terminal->counter_no],
                 'user' => ['id' => $user->id, 'name' => $user->name],
                 'price_lists' => PriceList::query()->orderByDesc('is_default')->orderBy('id')->get(['id', 'name'])->all(),
@@ -49,6 +62,9 @@ class CounterController extends Controller
                     'inbox' => route('api.pos.inbox'),
                     'quick' => route('api.pos.quick-items'),
                     'issue' => route('api.pos.invoices.store'),
+                    'pay' => route('api.pos.invoices.pay'),
+                    'settle' => url('/api/pos/sales/__ID__/settle'),
+                    'drawer_open' => route('pos.drawer.open'),
                     'today' => route('api.pos.invoices.today'),
                     'holds' => route('api.pos.holds.index'),
                     'hold' => route('api.pos.holds.store'),

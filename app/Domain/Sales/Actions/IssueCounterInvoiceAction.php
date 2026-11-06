@@ -48,9 +48,11 @@ class IssueCounterInvoiceAction
 
     /**
      * @param  array<string, mixed>  $cart
+     * @param  bool  $announce  false when the bill is settled at once: nothing waits for settlement,
+     *                          so Live Billing should not show (or beep for) a waiting invoice
      * @return array{sale: Sale, print_job: PrintJob|null, created: bool}
      */
-    public function handle(Terminal $terminal, User $user, array $cart, string $idempotencyKey): array
+    public function handle(Terminal $terminal, User $user, array $cart, string $idempotencyKey, bool $announce = true): array
     {
         $existing = Sale::query()->where('idempotency_key', $idempotencyKey)->first();
 
@@ -76,7 +78,9 @@ class IssueCounterInvoiceAction
 
         $this->store->forget($terminal->id);
 
-        LiveBroadcast::send(new InvoiceIssued($sale->liveSummary(), [$event->toBroadcast()]));
+        if ($announce) {
+            LiveBroadcast::send(new InvoiceIssued($sale->liveSummary(), [$event->toBroadcast()]));
+        }
 
         return ['sale' => $sale, 'print_job' => $printJob, 'created' => true];
     }

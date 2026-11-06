@@ -25,6 +25,7 @@
     </div>
 
     <hr class="rule">
+    <div class="row"><span>{{ $t('counter') }}</span><span>{{ $report['terminal'] }}</span></div>
     <div class="row"><span>{{ $t('from') }}</span><span class="num">{{ $report['from']->format('Y-m-d H:i') }}</span></div>
     <div class="row"><span>{{ $t('to') }}</span><span class="num">{{ $report['to']->format('Y-m-d H:i') }}</span></div>
 

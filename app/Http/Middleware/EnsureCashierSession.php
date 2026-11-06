@@ -9,13 +9,14 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Settlement and drawer routes: only on the registered main cashier terminal, only for
- * the holder of its open drawer session, and only while they hold cashier authority
- * (pos.settle, possibly through a delegation).
+ * Taking money: only on a registered terminal with its own cash drawer (the main machine,
+ * or a counter that takes payment), only for the holder of its open drawer session. At
+ * the main machine the holder must also hold cashier authority (pos.settle, possibly
+ * through a delegation).
  *
- *  - no drawer open        → "Open drawer" page (or 403 without drawer.manage)
+ *  - no drawer open        → "Open drawer" page (or 403 for someone who may not open it)
  *  - drawer held by others → 403
- *  - authority revoked or expired → "count the drawer" page
+ *  - authority revoked or expired (main machine) → "count the drawer" page
  *
  * The open session is available as $request->attributes->get('drawerSession').
  */
@@ -34,14 +35,14 @@ class EnsureCashierSession
                 : redirect()->route('terminal.unregistered');
         }
 
-        if (! $terminal->isMainCashier()) {
-            abort(403, 'Settlement is only available on the main cashier terminal.');
+        if (! $terminal->hasOwnDrawer()) {
+            abort(403, $terminal->displayName().' does not take payment. Print the bill and settle it at the main cashier.');
         }
 
         $session = DrawerSession::query()->where('terminal_id', $terminal->id)->open()->with('holder')->first();
 
         if ($session === null) {
-            if (! $user->can('drawer.manage')) {
+            if (! $terminal->canRunDrawer($user)) {
                 abort(403, 'You do not hold cashier authority.');
             }
 
@@ -52,7 +53,7 @@ class EnsureCashierSession
             abort(403, "The drawer is held by {$session->holder->name}.");
         }
 
-        if (! $user->can('pos.settle')) {
+        if ($terminal->isMainCashier() && ! $user->can('pos.settle')) {
             return $this->redirectTo($request, route('pos.authority-ended'), 'Cashier authority revoked or expired. Count the drawer.');
         }
 

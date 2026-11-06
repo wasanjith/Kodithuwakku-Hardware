@@ -18,7 +18,7 @@
             <x-pos.denomination-count :denominations="$denominations" :count="$count" title="Opening float" />
 
             <div class="flex justify-end gap-2">
-                <x-ui.button variant="secondary" :href="route('dashboard')">Cancel</x-ui.button>
+                <x-ui.button variant="secondary" :href="route($terminal->isMainCashier() ? 'dashboard' : 'pos.counter')">Cancel</x-ui.button>
                 <x-ui.button type="submit" size="lg">Open drawer</x-ui.button>
             </div>
         </form>

@@ -9,11 +9,11 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | H2 barcodes done. Next: H3 per-counter payment |
-| **Last updated** | 2026-11-05 |
-| **Tests** | 551 Pest tests: all 551 pass, 0 skipped, 0 fail (2026-11-05, parallel, ~4 min). Headless-Chrome scanner check 15/15. |
+| **Current phase** | H3 per-counter payment done. Next: H4 prices + VAT invoices |
+| **Last updated** | 2026-11-06 |
+| **Tests** | 580 Pest tests: all 580 pass, 0 skipped, 0 fail (2026-11-06, parallel, ~4 min). Headless-Chrome counter payment check 38/38. |
 | **Open issue** | Waiting for the owner's **shop details** (address, phone, VAT number, invoice footer), and their own logo file if they have one (a purple logo made for now is in `public/images/logo.svg` / `logo-icon.svg`). Site: start Herd; `kodithuwakkuhardware.test` needs a hosts entry if Herd does not add it. Own Docker services: Redis **6380**, Meilisearch **7701** (`docker compose -f docker-compose.dev.yml up -d`). |
-| **Next** | Owner: upload shop details (+ logo if any); when buying scanners, check they send Enter after the code. Dev: H3 per-counter payment. |
+| **Next** | Owner: upload shop details (+ logo if any); when buying scanners, check they send Enter after the code; say which counters have a cash drawer (tick it on Admin → Terminals from the main machine). Dev: H4 prices + VAT invoices. |
 
 ### Phase progress
 
@@ -22,7 +22,7 @@
 | H0 | Copy + own identity | ✅ Done |
 | H1 | Hardware catalogue base, English only, roles | 🟨 Done except logo + shop details |
 | H2 | Barcodes (POS scan, link unknown, GRN/stocktake/returns) | ✅ Done |
-| H3 | Per-counter payment + counter drawers | ⬜ |
+| H3 | Per-counter payment + counter drawers | ✅ Done |
 | H4 | Prices (contractor, special, bulk change), VAT invoices | ⬜ |
 | H5 | Quotation maker | ⬜ |
 | H6 | Serial numbers + warranty | ⬜ |
@@ -48,12 +48,27 @@
 | 2026-11-05 | **5-digit short codes** with category ranges (10,000+ products do not fit in 4 digits); a category without a range gets codes from 100000. |
 | 2026-11-05 | Sinhala stays in the code behind one switch, `pos.sinhala_fields` (env `POS_SINHALA_FIELDS`, off): hides the Sinhala/Tamil name fields, the Sinhala settings and the invoice-language choice. The columns stay. |
 | 2026-11-05 | Barcodes: one per product (products only, not variants, because each size is its own product). A scan is told apart from typing by key speed (6+ keys ≤ 50 ms apart + Enter); scans and typed 8–14 digit numbers use **exact lookup only**. Unknown barcodes are linked by **Owner / Manager** (`catalog.manage`, new policy `linkBarcode`); cashiers only see "not found". The change is in the product's activity log. |
+| 2026-11-06 | Drawer counters (dev decisions within plan § 3.3, for the owner to review): F9 issues and settles in **one transaction** (a refused payment uses no invoice number). A **Cashier** on a drawer counter may open, count and close its drawer, settle that counter's bills, pay in and safe drop. **Pay out, voids, returns, customer payments, discount approvals and the credit-limit override are not given to them**; a void refunds from the main drawer. The count is **blind** for a Cashier. A counter's close is not held up by open bills; the main machine's close still is. A drawer left open is closed by the **Owner**, at that counter. The setting changes only from the main machine. |
 
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-11-06: H3 per-counter payment + counter drawers
+- **Database:** migration `2026_11_06_100000_add_takes_payment_to_terminals_table`: `terminals.takes_payment` (default off; dev DB migrated). All counters stay off until the owner ticks them.
+- **Setting:** Admin → Terminals → edit, tick "This counter has a cash drawer and takes payment". Shown and accepted only at the main machine (elsewhere read-only, and other edits leave it alone). Refused while the counter has an open drawer, a printed open bill or a bill in progress. Changing a terminal to the main cashier type clears it. "Takes payment" badge on the terminal list.
+- **Access:** `Terminal::takesPayment()`, `hasOwnDrawer()`, `canRunDrawer($user)`. New middleware value `terminal:drawer` (main machine or drawer counter); the `cashier` middleware now covers both. `SalePolicy::settle`: a drawer counter settles only bills printed on it. `CashierAuthority` and `DrawerCash` still look at the main drawer only, so expenses, supplier payments and payroll are unchanged.
+- **F9 at a drawer counter:** `POST /api/pos/invoices/pay` → new `TakeCounterPaymentAction` wraps `IssueCounterInvoiceAction` + `SettleInvoiceAction` in one transaction. Retried key returns the first result and reprints what never printed. Reference box for card / transfer / cheque; drawer kick for cash through QZ Tray (a manual drawer is not an error); credit bill printed on this counter.
+- **Other counter screen changes:** "Pay and print (F9)", "Send to main cashier" (the old flow, for a customer who pays there), "Take payment" box on open bills in Last invoices, a banner when the drawer is closed or held by someone else, "Drawer: name" in the top bar.
+- **Drawer pages on a counter:** open (back to billing, the bill in progress comes back), pay in / safe drop, count and close with an optional **shift change** tick (handover slip; the next cashier continues the chain, one Z report). Owner: "Count and close this drawer" for a drawer left open (reuses `ReturnCashierAuthorityAction`, without touching delegations). Blind for a Cashier: no figures, no X report (`DrawerSessionPolicy`), no amount in the "does not hold that much" message.
+- **Z report:** names the terminal; a counter's report lists only its own voids. `CloseDrawerAction` blocks on waiting bills only at the main machine.
+- **Live Billing:** each drawer counter shows "Takes payment · holder · drawer Rs. …"; no beep and no waiting card for a bill settled at once (`announce: false`). Grid changed to 4 columns on wide screens (a leftover from 3 counters; the 4th sat alone on a second row). `LiveBroadcast` now waits for the commit, so a rolled-back sale never shows on a screen.
+- **Tests:** new `tests/Feature/Sales/CounterPaymentTest.php` (29 tests). **580 pass, 0 fail.** Pint clean, edited files LF. `npm run build` done.
+- **Checked in headless Chrome** (chrome-php, throwaway DB `kodithuwakkuDB_browser` via `php -S` on port 8124, file cache and sessions, dropped afterwards): **38/38**, no JavaScript errors: the setting, opening the drawer with a bill in progress, cash / card / credit refused / send to main / take payment on an open bill, Live Billing, blind drawer page, close and Z report (float 5,000 + cash 4,700 = expected 9,700; counted 10,000 → variance +300). The screenshots **found one layout problem, fixed**: the wider buttons squeezed the left buttons into one column and took space from the bill.
+- **Not covered:** a real cash drawer and QZ Tray on a counter (the kick was checked with a stand-in function), a real printer, and real-time updates through Reverb (the check ran with polling). QZ Tray must be installed on each counter whose drawer opens from the printer.
+- **Slip:** `pint --dirty` was run once during this work, and it calls git internally (read-only, nothing changed in git). Pint was run with explicit file paths after that.
 
 ### 2026-11-05: H2 barcodes
 - **Database:** migration `2026_11_05_100000_add_barcode_to_products_table`: `products.barcode` varchar(64), nullable, unique (dev DB migrated). In the Meilisearch index as a searchable attribute without typos (settings synced, products re-imported).

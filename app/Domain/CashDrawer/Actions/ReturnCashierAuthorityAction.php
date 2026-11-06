@@ -24,6 +24,9 @@ use Illuminate\Validation\ValidationException;
  * Also used when a delegation was revoked remotely or expired: the delegate can still
  * count and close the drawer they hold. The owner may close it themselves when the
  * delegate is not there.
+ *
+ * On a counter that takes payment there is no authority to return: the owner counts and
+ * closes a drawer its cashier left open, and the next person opens it.
  */
 class ReturnCashierAuthorityAction
 {
@@ -77,12 +80,14 @@ class ReturnCashierAuthorityAction
         $result = DB::transaction(function () use ($actingUser, $terminal, $session, $denominations, $newHolder, $note, $holder): array {
             $closed = $this->closeDrawer->handle($session, $actingUser, $denominations, DrawerCloseReason::Handover, $note);
 
-            Delegation::query()
-                ->where('to_user_id', $holder->id)
-                ->whereNull('revoked_at')
-                ->where('expires_at', '>', now())
-                ->get()
-                ->each(fn (Delegation $delegation) => $this->revoke->handle($delegation, $actingUser));
+            if ($terminal->isMainCashier()) {
+                Delegation::query()
+                    ->where('to_user_id', $holder->id)
+                    ->whereNull('revoked_at')
+                    ->where('expires_at', '>', now())
+                    ->get()
+                    ->each(fn (Delegation $delegation) => $this->revoke->handle($delegation, $actingUser));
+            }
 
             $opened = $newHolder !== null ? $this->openDrawer->handle($terminal, $newHolder, $denominations, $closed) : null;
 
@@ -93,10 +98,12 @@ class ReturnCashierAuthorityAction
             return ['closed' => $closed, 'opened' => $opened];
         });
 
-        LiveBroadcast::send(new CashierAuthorityChanged(
-            $this->authority->holderSummary(),
-            $newHolder !== null ? "{$newHolder->name} took cashier authority back from {$holder->name}." : "{$holder->name} counted and closed the drawer.",
-        ));
+        if ($terminal->isMainCashier()) {
+            LiveBroadcast::send(new CashierAuthorityChanged(
+                $this->authority->holderSummary(),
+                $newHolder !== null ? "{$newHolder->name} took cashier authority back from {$holder->name}." : "{$holder->name} counted and closed the drawer.",
+            ));
+        }
 
         return $result;
     }

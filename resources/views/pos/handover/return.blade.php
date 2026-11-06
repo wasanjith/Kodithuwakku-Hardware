@@ -5,7 +5,7 @@
 @section('content')
     <div class="mx-auto max-w-3xl p-4">
         <x-ui.page-header
-            :title="$isHolder ? 'Count and hand back the drawer' : 'Take the drawer back from '.$session->holder->name"
+            :title="match (true) { ! $atMain => 'Count and close the drawer of '.$session->holder->name, $isHolder => 'Count and hand back the drawer', default => 'Take the drawer back from '.$session->holder->name }"
             :description="'Drawer of '.$session->holder->name.' since '.$session->opened_at->format('H:i').'. Count the cash; the variance is recorded on the handover slip.'"
         />
 
@@ -20,8 +20,10 @@
 
             <x-pos.denomination-count :denominations="$denominations" :title="$isHolder ? 'Count the drawer' : 'Count the drawer (the holder is not here)'" />
 
-            <x-ui.card title="Who takes the drawer now">
-                @if ($isHolder)
+            <x-ui.card :title="$atMain ? 'Who takes the drawer now' : 'After the count'">
+                @if (! $atMain)
+                    <p class="text-sm text-gray-700">The drawer is closed with this count. The next person at this counter opens it again.</p>
+                @elseif ($isHolder)
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-ui.select name="new_holder_id" label="Owner" :options="$owners->pluck('name', 'id')->all()" placeholder="Nobody yet (owner opens later)" :value="old('new_holder_id')" />
                         <x-ui.input name="new_holder_pin" type="password" label="Owner's PIN" inputmode="numeric" maxlength="6" autocomplete="off" hint="Only if the owner takes over now." />

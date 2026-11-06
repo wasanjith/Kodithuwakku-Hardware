@@ -35,8 +35,18 @@ class SalePolicy
         return $user->can('pos.reprint') && $this->view($user, $sale);
     }
 
+    /**
+     * A counter that takes payment settles only the bills printed on that counter. The main
+     * machine settles any open bill.
+     */
     public function settle(User $user, Sale $sale): bool
     {
+        $terminal = app(CurrentTerminal::class)->get();
+
+        if ($terminal?->takesPayment()) {
+            return $user->can('pos.sell') && $sale->invoiced_terminal_id === $terminal->id;
+        }
+
         return $user->can('pos.settle');
     }
 

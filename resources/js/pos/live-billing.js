@@ -1,7 +1,7 @@
 import { api, ApiError, beep, isLive, money, onLiveChange, printPage, qty, randomKey } from './client';
 
 /**
- * Live Billing: the three counters in real time.
+ * Live Billing: the counters in real time.
  *
  *  - mode "cashier" (/pos/cashier on the main terminal): settle cards with Settle / Void,
  *    find by invoice number, discount approvals, drawer kick after a cash settlement.

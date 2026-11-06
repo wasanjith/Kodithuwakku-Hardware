@@ -27,13 +27,14 @@ class TerminalController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(CurrentTerminal $currentTerminal): View
     {
         $this->authorize('create', Terminal::class);
 
         return view('admin.terminals.form', [
             'terminal' => new Terminal(['type' => TerminalType::Counter, 'is_active' => true]),
             'types' => TerminalType::cases(),
+            'atMain' => $currentTerminal->get()?->isMainCashier() ?? false,
         ]);
     }
 
@@ -44,13 +45,14 @@ class TerminalController extends Controller
         return redirect()->route('admin.terminals.index')->with('success', "Terminal {$terminal->name} created.");
     }
 
-    public function edit(Terminal $terminal): View
+    public function edit(Terminal $terminal, CurrentTerminal $currentTerminal): View
     {
         $this->authorize('update', $terminal);
 
         return view('admin.terminals.form', [
             'terminal' => $terminal,
             'types' => TerminalType::cases(),
+            'atMain' => $currentTerminal->get()?->isMainCashier() ?? false,
         ]);
     }
 
