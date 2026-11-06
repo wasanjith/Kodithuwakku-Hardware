@@ -7,6 +7,7 @@
 <div
     x-data="posCounter(@js($config))"
     @keydown.window="keydown($event)"
+    @barcode-scan.window="onScan($event.detail)"
     class="grid h-full grid-cols-1 gap-3 p-3 lg:grid-cols-12"
 >
     {{-- Hotkeys --}}
@@ -17,7 +18,7 @@
     <span class="hidden" x-hotkey.f8="hold()"></span>
     <span class="hidden" x-hotkey.f9="print()"></span>
     <span class="hidden" x-hotkey.f10="reprintLast()"></span>
-    <span class="hidden" x-hotkey.escape="showInvoices || showHolds || showCustomer || showQuotations ? (showInvoices = showHolds = showCustomer = showQuotations = false, focusSearch()) : (query ? (query = '', results = []) : clearCart())"></span>
+    <span class="hidden" x-hotkey.escape="unknown ? closeUnknown() : showInvoices || showHolds || showCustomer || showQuotations ? (showInvoices = showHolds = showCustomer = showQuotations = false, focusSearch()) : (query ? (query = '', results = []) : clearCart())"></span>
 
     {{-- ============================== Left: search and quick grids ============================== --}}
     <section class="flex min-h-0 flex-col rounded-lg bg-white shadow-sm ring-1 ring-gray-200 lg:col-span-5">
@@ -34,7 +35,7 @@
                     @keydown.enter.prevent="chooseHighlighted()"
                     type="search"
                     autocomplete="off"
-                    placeholder="Code, name, brand, සිංහල, 5*urea … (F2)"
+                    placeholder="Scan, or type code, name, brand, 5*cement … (F2)"
                     class="block w-full rounded-md border-gray-300 py-3 pl-3 pr-10 text-lg focus:border-brand-500 focus:ring-brand-500"
                 >
                 <span x-show="searching" class="absolute right-3 top-3.5 text-xs text-gray-400">…</span>
@@ -102,7 +103,7 @@
                 </li>
             </template>
             <li x-show="results.length === 0" class="px-3 py-8 text-center text-sm text-gray-500">
-                <span x-show="tab === 'search'">Type a code or name. Enter adds the highlighted item. <kbd class="rounded bg-gray-100 px-1">5*urea</kbd> adds 5, <kbd class="rounded bg-gray-100 px-1">750g*urea</kbd> adds 750 g.</span>
+                <span x-show="tab === 'search'">Scan the item, or type a code or name: Enter adds the highlighted item. <kbd class="rounded bg-gray-100 px-1">12*</kbd> before a scan or code adds 12.</span>
                 <span x-show="tab !== 'search'" x-cloak>Nothing here yet.</span>
             </li>
         </ul>
@@ -198,7 +199,7 @@
                                 <td class="px-2 py-2">
                                     <div class="flex items-center gap-1">
                                         <button type="button" @click.stop="step(index, -1)" class="size-7 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200" aria-label="Less">−</button>
-                                        <input type="text" inputmode="decimal" x-model="line.qty" @input.debounce.300ms="changed()" @blur="normaliseQty(line)" @keydown.enter="normaliseQty(line)" @focus="$el.select()" class="w-16 rounded border-gray-300 px-1 py-1 text-center text-sm tabular" :aria-label="'Quantity of ' + line.name" :title="unitOf(line).symbol === 'kg' ? 'Type 750g for grams' : ''">
+                                        <input type="text" inputmode="decimal" :id="'qty-' + line.key" x-model="line.qty" @input.debounce.300ms="changed()" @blur="normaliseQty(line)" @keydown.enter.prevent="qtyDone(line)" @focus="$el.select()" class="w-16 rounded border-gray-300 px-1 py-1 text-center text-sm tabular" :aria-label="'Quantity of ' + line.name" :title="unitOf(line).symbol === 'kg' ? 'Type 750g for grams' : ''">
                                         <button type="button" @click.stop="step(index, 1)" class="size-7 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200" aria-label="More">+</button>
                                         <select @change="setUnit(line, $event.target.value)" class="rounded border-gray-300 py-1 pl-1 pr-6 text-xs" :aria-label="'Unit of ' + line.name">
                                             <template x-for="unit in line.units" :key="unit.id">
@@ -254,7 +255,7 @@
                     <p class="text-xs text-gray-400" x-show="config.max_discount_percent !== null" x-text="'Your limit: ' + config.max_discount_percent + ' %'"></p>
                 </div>
                 <div class="col-span-1 flex flex-col items-end justify-center rounded-md bg-gray-900 px-4 py-2 text-white sm:col-span-2">
-                    <span class="text-xs uppercase tracking-wide text-gray-300">Total · එකතුව</span>
+                    <span class="text-xs uppercase tracking-wide text-gray-300">Total</span>
                     <span class="text-5xl font-bold tabular" x-text="money(total)"></span>
                 </div>
             </div>
@@ -272,7 +273,7 @@
 
             <div x-show="isCredit" x-cloak class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md bg-violet-50 px-4 py-3 text-violet-900 ring-1 ring-violet-200">
                 <div class="text-sm">
-                    <p class="font-semibold">Credit sale · ණයට</p>
+                    <p class="font-semibold">Credit sale</p>
                     <p x-show="customer" x-text="customer ? customer.name + ' · ' + (customer.phone ?? '') : ''"></p>
                     <p class="text-xs">The invoice prints marked CREDIT. The cashier checks the credit limit.</p>
                 </div>
@@ -294,7 +295,7 @@
                     </div>
                 </div>
                 <div class="flex flex-col items-end justify-center rounded-md px-4 py-2 sm:col-span-2" :class="balance !== null && balance < 0 ? 'bg-red-50 text-red-800' : 'bg-brand-50 text-brand-900'">
-                    <span class="text-xs uppercase tracking-wide">Balance · ඉතිරිය</span>
+                    <span class="text-xs uppercase tracking-wide">Balance</span>
                     <span class="text-5xl font-bold tabular" x-text="balance === null ? '—' : money(balance)"></span>
                     <span x-show="balance !== null && balance < 0" class="text-xs">Tendered is less than the total.</span>
                 </div>
@@ -458,5 +459,57 @@
             </ul>
         </div>
     </div>
+
+    {{-- ============================== Unknown barcode ============================== --}}
+    <template x-if="unknown">
+        <div class="fixed inset-0 z-50 flex items-start justify-center bg-gray-900/40 p-4" @click.self="closeUnknown()">
+            <div class="mt-12 flex max-h-[80vh] w-full max-w-xl flex-col rounded-lg bg-white shadow-xl" role="dialog" aria-labelledby="unknown-barcode-title">
+                <header class="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3">
+                    <div>
+                        <h2 id="unknown-barcode-title" class="font-semibold text-red-700">Barcode not found</h2>
+                        <p class="font-mono text-lg" x-text="unknown.code"></p>
+                    </div>
+                    <button type="button" @click="closeUnknown()" class="text-2xl leading-none text-gray-500" aria-label="Close">&times;</button>
+                </header>
+
+                <template x-if="! config.can_link_barcode">
+                    <div class="space-y-3 p-4 text-sm">
+                        <p>No product has this barcode yet. Find the item by its name or short code, and ask the manager to link the barcode to it.</p>
+                        <x-ui.button @click="closeUnknown()">OK (Esc)</x-ui.button>
+                    </div>
+                </template>
+
+                <template x-if="config.can_link_barcode">
+                    <div class="flex min-h-0 flex-1 flex-col">
+                        <div class="border-b border-gray-200 p-3">
+                            <label for="unknown-barcode-search" class="text-sm text-gray-700">Which product is it? The barcode is saved on it, so the next scan finds it.</label>
+                            <input id="unknown-barcode-search" x-model="unknown.query" @input.debounce.200ms="searchUnknown()" @keydown.enter.prevent="unknown.results.length === 1 && linkUnknown(unknown.results[0])" type="search" autocomplete="off" placeholder="Name or short code" class="mt-2 block w-full rounded-md border-gray-300 text-lg">
+                            <p x-show="unknown.error" x-text="unknown.error" class="mt-2 text-sm text-red-700"></p>
+                        </div>
+                        <template x-if="unknown.replace">
+                            <div class="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                <p class="flex-1" x-text="unknown.replace.message"></p>
+                                <x-ui.button size="sm" @click="linkUnknown(unknown.replace.item, true)">Replace</x-ui.button>
+                                <x-ui.button size="sm" variant="secondary" @click="unknown.replace = null">Cancel</x-ui.button>
+                            </div>
+                        </template>
+                        <ul class="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto">
+                            <template x-for="item in unknown.results" :key="item.key">
+                                <li class="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                                    <div class="min-w-0">
+                                        <span class="font-mono text-xs font-semibold text-brand-700" x-text="item.short_code"></span>
+                                        <span class="font-medium" x-text="item.name"></span>
+                                        <span x-show="item.barcode" class="block text-xs text-gray-500" x-text="'Has barcode ' + item.barcode"></span>
+                                    </div>
+                                    <x-ui.button size="sm" x-bind:disabled="unknown.linking" @click="linkUnknown(item)">This one</x-ui.button>
+                                </li>
+                            </template>
+                            <li x-show="unknown.query.trim() !== '' && unknown.results.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">No products found. Add the product first (Catalogue → Products).</li>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 </div>
 @endsection

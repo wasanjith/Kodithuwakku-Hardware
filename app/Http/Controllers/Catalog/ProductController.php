@@ -39,7 +39,7 @@ class ProductController extends Controller
         $products = $this->applyListQuery(
             Product::query()->with(['category', 'brand', 'baseUnit', 'units.unit'])->addSelect(['on_hand' => StockAlerts::onHandSubquery()]),
             $request,
-            searchable: ['short_code', 'name', 'name_si', 'aliases', 'sku', 'brand.name'],
+            searchable: ['short_code', 'barcode', 'name', 'name_si', 'aliases', 'sku', 'brand.name'],
             sortable: ['short_code', 'name', 'created_at', 'updated_at'],
             filters: self::listFilters(),
             defaultSort: 'short_code',
@@ -78,6 +78,12 @@ class ProductController extends Controller
             'low' => function (Builder $query, string $value): void {
                 if ($value === '1') {
                     app(StockAlerts::class)->whereLowStock($query);
+                }
+            },
+            // Barcodes still to be scanned in (about 40 % of the goods carry a maker's barcode).
+            'no_barcode' => function (Builder $query, string $value): void {
+                if ($value === '1') {
+                    $query->whereNull('barcode');
                 }
             },
             // Products the counter cannot bill: no current price on the default (Retail) list.
@@ -171,6 +177,11 @@ class ProductController extends Controller
     public function destroy(Product $product): RedirectResponse
     {
         $this->authorize('delete', $product);
+
+        // A deleted product gives its barcode up, so it can be linked to the product that replaces it.
+        if ($product->barcode !== null) {
+            $product->update(['barcode' => null]);
+        }
 
         $product->delete();
 

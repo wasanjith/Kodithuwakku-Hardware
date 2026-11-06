@@ -286,3 +286,23 @@ test('the export uses the import layout, with both loose prices', function () {
         ->and($rows[1]['Opens Into'])->toBe('1100')
         ->and($rows[1]['Loose Qty Per Pack'])->toBe('50.000');
 });
+
+test('barcodes are imported, also when Excel turned them into numbers; duplicates are refused', function () {
+    createProduct(['short_code' => '1900', 'name' => 'Old tap', 'category' => 'Building Materials', 'barcode' => '4790000000001']);
+
+    $response = $this->actingAs($this->owner)->post(route('catalog.products.import.preview'), [
+        'file' => importFile([
+            ureaRow(['short_code' => '1001', 'barcode' => '4792081001234', 'opening_stock' => '', 'batch_no' => '', 'expiry_date' => '']),
+            ureaRow(['short_code' => '1002', 'name' => 'Urea 25kg', 'barcode' => '4.792081001235E+12', 'opening_stock' => '', 'batch_no' => '', 'expiry_date' => '']),
+            ureaRow(['short_code' => '1003', 'name' => 'Urea 10kg', 'barcode' => '4792081001234', 'opening_stock' => '', 'batch_no' => '', 'expiry_date' => '']),
+            ureaRow(['short_code' => '1004', 'name' => 'Urea 5kg', 'barcode' => '4790000000001', 'opening_stock' => '', 'batch_no' => '', 'expiry_date' => '']),
+        ]),
+    ])->assertOk();
+
+    expect($response->viewData('rowErrors'))->toBe([
+        4 => ['Barcode 4792081001234 appears more than once in the file (row 2).'],
+        5 => ['Barcode 4790000000001 already belongs to 1900 · Old tap.'],
+    ])
+        ->and($response->viewData('valid')[2]['barcode'])->toBe('4792081001234')
+        ->and($response->viewData('valid')[3]['barcode'])->toBe('4792081001235');
+});

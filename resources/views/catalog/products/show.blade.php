@@ -37,6 +37,7 @@
                     <div class="sm:col-span-2"><dt class="text-gray-500">Aliases</dt><dd>{{ $product->aliases ?: '—' }}</dd></div>
                     <div><dt class="text-gray-500">Brand</dt><dd>{{ $product->brand?->name ?? '—' }}</dd></div>
                     <div><dt class="text-gray-500">SKU</dt><dd>{{ $product->sku ?: '—' }}</dd></div>
+                    <div><dt class="text-gray-500">Barcode</dt><dd class="font-mono">{{ $product->barcode ?: '—' }}</dd></div>
                     <div><dt class="text-gray-500">Base unit</dt><dd>{{ $product->baseUnit?->name }}@if ($product->sold_loose) <x-ui.badge color="blue">sold loose</x-ui.badge>@endif</dd></div>
                     @if ($product->opensInto)
                         <div><dt class="text-gray-500">Opens into</dt><dd><a href="{{ route('catalog.products.show', $product->opensInto) }}" class="text-brand-700 hover:underline">{{ $product->opensInto->name }}</a> · {{ \App\Domain\Inventory\Support\Qty::format($product->opens_into_qty) }} {{ $product->opensInto->baseUnit?->symbol }} per {{ $product->baseUnit?->symbol }}</dd></div>

@@ -19,6 +19,7 @@
         <x-ui.select name="filter[status]" :options="['active' => 'Active', 'inactive' => 'Inactive']" :value="request('filter.status')" placeholder="Any status" />
         <x-ui.checkbox name="filter[low]" label="Low stock" :checked="request('filter.low') === '1'" class="self-center" />
         <x-ui.checkbox name="filter[no_price]" label="No selling price" :checked="request('filter.no_price') === '1'" class="self-center" />
+        <x-ui.checkbox name="filter[no_barcode]" label="No barcode" :checked="request('filter.no_barcode') === '1'" class="self-center" />
     </x-ui.filter-bar>
 
     @if ($products->isEmpty())

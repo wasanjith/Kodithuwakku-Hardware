@@ -1,4 +1,8 @@
+import { scanMissing, scanOk } from '../scanner';
 import { api, ApiError, beep, isLive, money, onLiveChange, printPage, qty, randomKey, uuid } from './client';
+
+/** Digits only, 8 to 14 long: what EAN-8 / UPC-A / EAN-13 / ITF-14 barcodes look like when typed. */
+const looksLikeBarcode = (term) => /^\d{8,14}$/.test(term);
 
 /**
  * Counter billing screen (/pos). The cart lives in the browser for instant response and
@@ -66,6 +70,11 @@ export default function posCounter(config) {
         quotationQuery: '',
         quoting: false,
         quoteKey: null,
+
+        // Barcode scanner: a scan in flight, and an unknown barcode waiting to be linked
+        // { code, qty, query, results, linking, error, replace }
+        scanning: false,
+        unknown: null,
 
         init() {
             this.cart = this.emptyCart();
@@ -194,6 +203,9 @@ export default function posCounter(config) {
             const term = this.query.trim();
             this.tab = 'search';
 
+            // A scan looks the code up itself; the debounced search must not show a list meanwhile.
+            if (this.scanning) return Promise.resolve();
+
             if (term === '') {
                 this.searchController?.abort();
                 this.results = [];
@@ -282,6 +294,13 @@ export default function posCounter(config) {
         },
 
         async chooseHighlighted() {
+            // A barcode typed by hand: exact lookup only, so a near match never goes on the bill.
+            const typed = this.query.trim();
+            if (this.tab === 'search' && looksLikeBarcode(typed.replace(/^\d+(?:\.\d+)?\s*\*\s*/, ''))) {
+                await this.scanCode(typed);
+                return;
+            }
+
             // Enter pressed before the results for what is typed now arrived: search first.
             if (this.tab === 'search' && this.query.trim() !== '' && this.resultsFor !== this.query.trim()) {
                 await this.search();
@@ -289,6 +308,141 @@ export default function posCounter(config) {
             }
             const item = this.results[this.highlighted];
             if (item) this.add(item, item.qty);
+        },
+
+        // ------------------------------------------------------------------ barcode scanner
+
+        /**
+         * 'barcode-scan' from resources/js/scanner.js. The item is added with qty 1 (or the
+         * "12*" typed before the scan) and the cursor goes to its quantity box; Enter there
+         * goes back to the search box. Scanning the same item again adds 1 more.
+         */
+        onScan(detail) {
+            // Not while a panel is open, and never into the amount tendered.
+            if (this.showInvoices || this.showHolds || this.showCustomer || this.showQuotations || this.unknown) return;
+            if (detail.target === this.$refs.tendered) return;
+
+            detail.handled = true;
+            let term = detail.code;
+
+            if (detail.target === this.$refs.search) {
+                detail.keepText = true;
+                term = this.query.trim();
+            }
+
+            this.scanCode(term);
+        },
+
+        async scanCode(term) {
+            this.searchController?.abort();
+            this.pendingSearch = null;
+            this.searching = false;
+            this.scanning = true;
+            this.tab = 'search';
+            this.query = term;
+            this.error = null;
+
+            try {
+                const params = new URLSearchParams({ q: term, limit: 10, exact: 1 });
+                if (this.cart.price_list_id) params.set('price_list_id', this.cart.price_list_id);
+                const data = await api(`${this.config.urls.search}?${params}`);
+                const items = (data.items ?? []).map((item) => ({ ...item, qty: data.qty }));
+
+                if (items.length === 1 && ['barcode', 'code'].includes(data.engine)) {
+                    scanOk();
+                    this.scanning = false;
+                    this.add(items[0], data.qty, { focusQty: true });
+                    return;
+                }
+
+                if (items.length === 0) {
+                    this.scanning = false;
+                    this.query = '';
+                    this.openUnknown(data.term || term, data.qty);
+                    return;
+                }
+
+                // Several matches (a product with sizes): the cashier picks one.
+                this.results = items;
+                this.resultsFor = term;
+                this.highlighted = 0;
+            } catch (error) {
+                this.error = error.message;
+            } finally {
+                this.scanning = false;
+            }
+        },
+
+        openUnknown(code, amount = null) {
+            scanMissing();
+            this.results = [];
+            this.resultsFor = null;
+            this.query = '';
+            this.unknown = { code, qty: amount, query: '', results: [], linking: false, error: null, replace: null };
+            if (this.config.can_link_barcode) {
+                this.$nextTick(() => document.getElementById('unknown-barcode-search')?.focus());
+            }
+        },
+
+        closeUnknown() {
+            this.unknown = null;
+            this.focusSearch();
+        },
+
+        async searchUnknown() {
+            const term = this.unknown?.query.trim() ?? '';
+            if (!this.unknown || term === '') {
+                if (this.unknown) this.unknown.results = [];
+                return;
+            }
+            try {
+                const params = new URLSearchParams({ q: term, limit: 8 });
+                if (this.cart.price_list_id) params.set('price_list_id', this.cart.price_list_id);
+                const data = await api(`${this.config.urls.search}?${params}`);
+                if (this.unknown && this.unknown.query.trim() === term) this.unknown.results = data.items ?? [];
+            } catch (error) {
+                if (this.unknown) this.unknown.error = error.message;
+            }
+        },
+
+        /** Save the unknown barcode on the chosen product, then put the product on the bill. */
+        async linkUnknown(item, replace = false) {
+            const unknown = this.unknown;
+            if (!unknown || unknown.linking) return;
+            unknown.linking = true;
+            unknown.error = null;
+
+            try {
+                const data = await api(this.config.urls.barcode_link, { method: 'POST', body: { barcode: unknown.code, product_id: item.id, replace } });
+                this.unknown = null;
+                this.notice = data.message;
+                scanOk();
+                this.add(item, unknown.qty, { focusQty: true });
+            } catch (error) {
+                unknown.linking = false;
+                if (error instanceof ApiError && error.errors?.replace) {
+                    unknown.replace = { item, message: error.errors.replace[0] };
+                } else {
+                    unknown.error = error instanceof ApiError ? error.first : error.message;
+                }
+            }
+        },
+
+        focusQty(index) {
+            this.$nextTick(() => {
+                const line = this.cart.lines[index];
+                const input = line ? document.getElementById(`qty-${line.key}`) : null;
+                if (!input) return;
+                input.focus();
+                input.select();
+            });
+        },
+
+        /** Enter in a quantity box: tidy it and go back to the search box for the next item. */
+        qtyDone(line) {
+            this.normaliseQty(line);
+            this.changed();
+            this.focusSearch();
         },
 
         stockColour(item) {
@@ -307,7 +461,7 @@ export default function posCounter(config) {
 
         // ------------------------------------------------------------------ cart
 
-        add(item, amount = null) {
+        add(item, amount = null, { focusQty = false } = {}) {
             this.error = null;
             this.printed = null;
             const unit = item.unit ?? item.units?.[0];
@@ -356,7 +510,12 @@ export default function posCounter(config) {
             this.brandsFor = null;
             this.brandId = null;
             this.changed();
-            this.focusSearch();
+
+            if (focusQty) {
+                this.focusQty(this.selected);
+            } else {
+                this.focusSearch();
+            }
         },
 
         remove(index) {

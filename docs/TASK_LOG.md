@@ -9,11 +9,11 @@
 
 | Item | Status |
 |---|---|
-| **Current phase** | H1 hardware catalogue base done (except logo + shop details). Next: H2 barcodes |
+| **Current phase** | H2 barcodes done. Next: H3 per-counter payment |
 | **Last updated** | 2026-11-05 |
-| **Tests** | 538 Pest tests: all 538 pass, 0 skipped, 0 fail (2026-11-05, parallel, ~4 min) |
+| **Tests** | 551 Pest tests: all 551 pass, 0 skipped, 0 fail (2026-11-05, parallel, ~4 min). Headless-Chrome scanner check 15/15. |
 | **Open issue** | Waiting for the owner's **shop details** (address, phone, VAT number, invoice footer), and their own logo file if they have one (a purple logo made for now is in `public/images/logo.svg` / `logo-icon.svg`). Site: start Herd; `kodithuwakkuhardware.test` needs a hosts entry if Herd does not add it. Own Docker services: Redis **6380**, Meilisearch **7701** (`docker compose -f docker-compose.dev.yml up -d`). |
-| **Next** | Owner: upload logo + shop details. Dev: H2 barcodes, then H3 per-counter payment. |
+| **Next** | Owner: upload shop details (+ logo if any); when buying scanners, check they send Enter after the code. Dev: H3 per-counter payment. |
 
 ### Phase progress
 
@@ -21,7 +21,7 @@
 |---|---|---|
 | H0 | Copy + own identity | ✅ Done |
 | H1 | Hardware catalogue base, English only, roles | 🟨 Done except logo + shop details |
-| H2 | Barcodes (POS scan, link unknown, GRN/stocktake/returns) | ⬜ |
+| H2 | Barcodes (POS scan, link unknown, GRN/stocktake/returns) | ✅ Done |
 | H3 | Per-counter payment + counter drawers | ⬜ |
 | H4 | Prices (contractor, special, bulk change), VAT invoices | ⬜ |
 | H5 | Quotation maker | ⬜ |
@@ -47,12 +47,27 @@
 | 2026-11-05 | Defaults taken where the owner said "default": discounts **Cashier 10 % / Manager 25 %**, above that the Owner approves; delivery by own vehicle, charge typed per delivery, pay now and collect later. "Yes" to VAT taken as: prices include VAT, some items VAT-exempt (per product). |
 | 2026-11-05 | **5-digit short codes** with category ranges (10,000+ products do not fit in 4 digits); a category without a range gets codes from 100000. |
 | 2026-11-05 | Sinhala stays in the code behind one switch, `pos.sinhala_fields` (env `POS_SINHALA_FIELDS`, off): hides the Sinhala/Tamil name fields, the Sinhala settings and the invoice-language choice. The columns stay. |
+| 2026-11-05 | Barcodes: one per product (products only, not variants, because each size is its own product). A scan is told apart from typing by key speed (6+ keys ≤ 50 ms apart + Enter); scans and typed 8–14 digit numbers use **exact lookup only**. Unknown barcodes are linked by **Owner / Manager** (`catalog.manage`, new policy `linkBarcode`); cashiers only see "not found". The change is in the product's activity log. |
 
 ---
 
 ## Log
 
 Newest first.
+
+### 2026-11-05: H2 barcodes
+- **Database:** migration `2026_11_05_100000_add_barcode_to_products_table`: `products.barcode` varchar(64), nullable, unique (dev DB migrated). In the Meilisearch index as a searchable attribute without typos (settings synced, products re-imported).
+- **Rules** (`BarcodeRegistry`): printable characters, no spaces, 3–64 long; refused when another product has it ("Barcode … already belongs to 20001 · PVC Pipe …"), or when it is another product's short code. A new short code may not be another product's barcode. A deleted product gives its barcode up.
+- **Search** (`ProductSearchService`): exact barcode → exact short code → search, new engine `barcode`; `exact=1` for scans returns only exact matches. Items carry `barcode`.
+- **Linking:** `POST /api/barcodes` (`BarcodeLinkController`) saves an unknown barcode on a product; asks before replacing a product's existing barcode (422 `replace`).
+- **Scanner listener** `resources/js/scanner.js` (installed in `app.js`): fast keys + Enter → window event `barcode-scan`; the Enter never submits a form; the field the code went into gets its old value back; fields marked `data-barcode-field` keep the scan. Beep when found, buzz when not (Web Audio).
+- **Counter:** scan → item added (or +1) → cursor in its quantity box; type 12 + Enter → back to the search box; `3*` before a scan works; a scan while the cursor is in a quantity box adds the item and leaves that quantity alone. Unknown barcode → "Barcode not found" panel: Owner/Manager search and pick the product ("This one"), it is saved and put on the bill; cashiers see a message. Leftover Sinhala labels on the counter (Total / Balance / Credit sale) and the "5*urea" hint replaced.
+- **Product picker** (GRN, PO, adjustments, supplier returns): a scan anywhere in the form picks the product, also when the PO supplier is not linked to it yet; unknown barcodes can be linked in the picker. Enter waits for the results of what was typed. **GRN:** an item already on the receipt jumps to its quantity instead of a second line; Enter in a quantity goes back to the product box (it used to save the draft).
+- **Stocktake count sheet and returns:** new Alpine component `scanRows`: a scan finds the row by barcode or short code and puts the cursor in its quantity (stocktake clears its filter first); "not on this count sheet / invoice" otherwise.
+- **Product pages:** barcode field on the form ("click here and scan"), barcode on the product page, product list search by barcode and a "No barcode" filter; product export and import have a **Barcode** column (long numbers that Excel turned into 4.79E+12 are written out in full; duplicates in the file and barcodes already used are reported by row).
+- **Checked in headless Chrome** (chrome-php, throwaway DB `kodithuwakkuDB_browser` via `php -S` on port 8124, dropped afterwards, no Redis keys left): 15/15 counter + GRN scan checks, no JavaScript errors. The check **found and fixed two bugs**: (1) an unknown 13-digit barcode got "near" matches from the MySQL search (number fragments matched short codes), so a list showed instead of "not found", and a barcode typed by hand + Enter could put the wrong product on the bill → exact-only lookup for scans and typed barcodes; (2) on the GRN the picker took the cursor back from the new line's quantity box.
+- **Tests:** new `tests/Feature/Catalog/BarcodeTest.php` (12 tests: form, duplicates, code/barcode clash, search + `12*`, exact mode, inactive, linking, cashier refused, replace, delete frees it, list search/filter, counter config); import barcode test; stocktake and return pages show the scan rows. **551 pass, 0 fail.** Pint clean, edited files LF.
+- **Not covered by automatic tests:** the JavaScript itself (no JS test runner in the project); it was checked in the browser as above. A real USB scanner is still to be tried at the shop.
 
 ### 2026-11-05: Owner's answers recorded; H1 hardware catalogue base
 - **Plan:** answers to all 12 questions in [HARDWARE_PLAN.md § 1.1](HARDWARE_PLAN.md#11-answers-to-the-open-questions-2026-11-05); § 3.2 now covers the phone page for supplier invoice photos (instead of phone barcode scanning), § 3.3 covers per-counter payment (instead of one shop-wide toggle), § 3.13 covers typing the list in from the books. § 5 left open: logo + shop details only.

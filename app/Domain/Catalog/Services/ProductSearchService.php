@@ -21,7 +21,8 @@ use Throwable;
  * Product search for the POS and the back office.
  *
  *   1. "5*urea" → qty 5, term "urea"; "750g*urea" → qty 0.75 (grams of a kg product).
- *   2. An exact short code (product or variant) returns just that item.
+ *   2. An exact barcode (scanner or typed), then an exact short code (product or variant),
+ *      returns just that item (engine "barcode" / "code").
  *   3. Otherwise Meilisearch; if it is down, MySQL FULLTEXT (ngram) + LIKE on short codes.
  *   4. Hits are hydrated from MySQL with live prices and live stock (on hand − reserved).
  *   5. Cost fields are only included for users with catalog.cost.view.
@@ -32,6 +33,8 @@ use Throwable;
  */
 class ProductSearchService
 {
+    public const ENGINE_BARCODE = 'barcode';
+
     public const ENGINE_CODE = 'code';
 
     public const ENGINE_MEILISEARCH = 'meilisearch';
@@ -44,7 +47,7 @@ class ProductSearchService
     ) {}
 
     /**
-     * @param  array{category_id?: int|null, brand_id?: int|null, supplier_id?: int|null, include_inactive?: bool}  $filters
+     * @param  array{category_id?: int|null, brand_id?: int|null, supplier_id?: int|null, include_inactive?: bool, exact_only?: bool}  $filters
      * @return array{term: string, qty: string|null, engine: string, items: list<array<string, mixed>>, brands: list<array{id: int, name: string, count: int}>}
      */
     public function search(string $query, array $filters = [], int $limit = 20, ?User $user = null, ?int $priceListId = null): array
@@ -70,7 +73,12 @@ class ProductSearchService
         if ($exact !== null) {
             $items = $this->hydrate($exact[0], $priceListId, $user, onlyVariantId: $exact[1]);
 
-            return ['term' => $term, 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => $items, 'brands' => self::brandsOf($items)];
+            return ['term' => $term, 'qty' => $qty, 'engine' => $exact[2], 'items' => $items, 'brands' => self::brandsOf($items)];
+        }
+
+        // A scan means one exact barcode or code: "near" matches of a long number are noise.
+        if ($filters['exact_only'] ?? false) {
+            return ['term' => $term, 'qty' => $qty, 'engine' => self::ENGINE_CODE, 'items' => [], 'brands' => []];
         }
 
         [$ids, $engine] = $this->findIds($term, $filters, $limit);
@@ -132,20 +140,25 @@ class ProductSearchService
     }
 
     /**
-     * @return array{0: list<int>, 1: int|null}|null product ids and the matched variant id
+     * Barcode first (the scanner), then the product or variant short code.
+     *
+     * @return array{0: list<int>, 1: int|null, 2: string}|null product ids, the matched variant id and how it matched
      */
     private function exactCode(string $term, bool $includeInactive, ?int $supplierId = null): ?array
     {
         $code = mb_strtoupper($term);
-
-        $product = Product::query()
+        $products = fn () => Product::query()
             ->when(! $includeInactive, fn (Builder $query) => $query->active())
-            ->when($supplierId, fn (Builder $query) => self::suppliedBy($query, $supplierId))
-            ->where('short_code', $code)
-            ->first();
+            ->when($supplierId, fn (Builder $query) => self::suppliedBy($query, $supplierId));
+
+        if (! str_contains($term, ' ') && ($id = $products()->where('barcode', $term)->value('id')) !== null) {
+            return [[(int) $id], null, self::ENGINE_BARCODE];
+        }
+
+        $product = $products()->where('short_code', $code)->first();
 
         if ($product !== null) {
-            return [[$product->id], null];
+            return [[$product->id], null, self::ENGINE_CODE];
         }
 
         $variant = ProductVariant::query()
@@ -155,7 +168,7 @@ class ProductSearchService
             ->when($supplierId, fn (Builder $query) => $query->whereHas('product', fn (Builder $product) => self::suppliedBy($product, $supplierId)))
             ->first();
 
-        return $variant === null ? null : [[$variant->product_id], $variant->id];
+        return $variant === null ? null : [[$variant->product_id], $variant->id, self::ENGINE_CODE];
     }
 
     /**
@@ -451,6 +464,7 @@ class ProductSearchService
             'id' => $product->id,
             'variant_id' => null,
             'short_code' => $product->short_code,
+            'barcode' => $product->barcode,
             'name' => $product->name,
             'variant_name' => null,
             'name_si' => $product->name_si,

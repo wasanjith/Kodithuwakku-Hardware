@@ -9,6 +9,7 @@ use App\Domain\Catalog\Models\OpeningStockEntry;
 use App\Domain\Catalog\Models\PriceList;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\Unit;
+use App\Domain\Catalog\Services\BarcodeRegistry;
 use App\Domain\Catalog\Services\ShortCodeGenerator;
 use App\Domain\Inventory\Actions\PostOpeningStockAction;
 use App\Domain\Inventory\Support\Qty;
@@ -69,6 +70,7 @@ class ProductImporter
         private readonly ShortCodeGenerator $codes,
         private readonly SaveProductAction $saveProduct,
         private readonly PostOpeningStockAction $postOpeningStock,
+        private readonly BarcodeRegistry $barcodes,
     ) {}
 
     /**
@@ -124,12 +126,25 @@ class ProductImporter
         $errors = [];
         $warnings = [];
         $seenCodes = [];
+        $seenBarcodes = [];
         $names = [];
         $group = null;
 
         foreach ($rows as $number => $row) {
             [$row, $group] = $this->continueGroup($row, $group);
             [$data, $rowErrors, $rowWarnings] = $this->checkRow($row, $seenCodes);
+
+            // One barcode per product: not twice in the file, not already on a product.
+            $data['barcode'] = self::barcodeOf($row['barcode'] ?? null);
+            if ($data['barcode'] !== null) {
+                $barcodeKey = mb_strtolower($data['barcode']);
+                if (isset($seenBarcodes[$barcodeKey])) {
+                    $rowErrors[] = "Barcode {$data['barcode']} appears more than once in the file (row {$seenBarcodes[$barcodeKey]}).";
+                } elseif (($problem = $this->barcodes->problem($data['barcode'])) !== null) {
+                    $rowErrors[] = $problem;
+                }
+                $seenBarcodes[$barcodeKey] ??= $number;
+            }
 
             $nameKey = mb_strtolower((string) $data['name']);
             if ($nameKey !== '' && isset($names[$nameKey])) {
@@ -223,6 +238,21 @@ class ProductImporter
         $products->first()?->searchableUsing()->update($products);
 
         return count($ids);
+    }
+
+    /**
+     * The barcode cell as text. Excel keeps a long barcode typed as a number as a number
+     * (4792081001234 or even 4.792081001234E+12), so whole numbers are written out in full.
+     */
+    private static function barcodeOf(mixed $value): ?string
+    {
+        if (is_int($value) || (is_float($value) && floor($value) === $value)) {
+            $value = sprintf('%.0f', $value);
+        } elseif (is_string($value) && preg_match('/^\d+(\.\d+)?E\+\d+$/i', trim($value)) === 1) {
+            $value = sprintf('%.0f', (float) $value);
+        }
+
+        return BarcodeRegistry::normalise(is_scalar($value) ? (string) $value : null);
     }
 
     /**

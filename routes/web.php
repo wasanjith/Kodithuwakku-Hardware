@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\TerminalController;
 use App\Http\Controllers\Admin\TerminalDeviceController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\BarcodeLinkController;
 use App\Http\Controllers\Api\BatchLookupController;
 use App\Http\Controllers\Api\LiveBillingSnapshotController;
 use App\Http\Controllers\Api\ProductSearchController;
@@ -93,6 +94,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/account', [AccountController::class, 'show'])->name('account');
 
     Route::get('/api/pos/search', ProductSearchController::class)->middleware('throttle:120,1')->name('api.pos.search');
+    Route::post('/api/barcodes', BarcodeLinkController::class)->middleware('throttle:60,1')->name('api.barcodes.link');
 
     /*
     | Phase 3: POS. The counter screen works on every registered terminal; settlement,

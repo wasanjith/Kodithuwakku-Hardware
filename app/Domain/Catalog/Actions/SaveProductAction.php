@@ -31,7 +31,7 @@ use Illuminate\Validation\ValidationException;
 class SaveProductAction
 {
     private const PRODUCT_FIELDS = [
-        'short_code', 'sku', 'name', 'name_si', 'name_ta', 'aliases', 'description',
+        'short_code', 'sku', 'barcode', 'name', 'name_si', 'name_ta', 'aliases', 'description',
         'category_id', 'brand_id', 'base_unit_id', 'sold_loose', 'opens_into_product_id', 'opens_into_qty', 'tax_id',
         'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty', 'attributes', 'is_active',
     ];

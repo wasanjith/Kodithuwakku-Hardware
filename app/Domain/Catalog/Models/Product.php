@@ -25,6 +25,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property int $id
  * @property string $short_code
  * @property string|null $sku
+ * @property string|null $barcode
  * @property string $name
  * @property string|null $name_si
  * @property string|null $name_ta
@@ -51,7 +52,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property int|null $created_by
  */
 #[Fillable([
-    'short_code', 'sku', 'name', 'name_si', 'name_ta', 'aliases', 'description',
+    'short_code', 'sku', 'barcode', 'name', 'name_si', 'name_ta', 'aliases', 'description',
     'category_id', 'brand_id', 'base_unit_id', 'sold_loose', 'opens_into_product_id', 'opens_into_qty', 'tax_id',
     'has_variants', 'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty',
     'min_selling_margin_pct', 'reference_cost', 'attributes', 'image_path', 'is_active', 'created_by',
@@ -98,7 +99,7 @@ class Product extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                'short_code', 'sku', 'name', 'name_si', 'aliases', 'category_id', 'brand_id', 'base_unit_id',
+                'short_code', 'sku', 'barcode', 'name', 'name_si', 'aliases', 'category_id', 'brand_id', 'base_unit_id',
                 'sold_loose', 'opens_into_product_id', 'opens_into_qty', 'tax_id',
                 'has_variants', 'track_batches', 'track_expiry', 'reorder_level', 'reorder_qty',
                 'min_selling_margin_pct', 'reference_cost', 'is_active',
@@ -231,6 +232,7 @@ class Product extends Model
         return [
             'id' => $this->id,
             'short_code' => $this->short_code,
+            'barcode' => $this->barcode,
             'name' => $this->name,
             'aliases' => $this->aliasList(),
             'name_si' => $this->name_si,

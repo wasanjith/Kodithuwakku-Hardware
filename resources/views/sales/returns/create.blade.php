@@ -34,6 +34,7 @@
                 $defaultMethod = old('refund_method', $sale->customer_id && $isCredit ? 'account' : 'cash');
             @endphp
             <form method="POST" action="{{ route('pos.returns.store', $sale) }}" x-data="{ busy: false }" @submit="busy = true">
+                <div x-data="scanRows({ notFound: 'Barcode :code is not on invoice {{ $sale->invoice_no }}.' })" @barcode-scan.window="onScan($event.detail)">
                 @csrf
                 <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', $idempotencyKey) }}">
 
@@ -49,7 +50,7 @@
                         </x-slot:head>
                         @foreach ($rows as $itemId => $row)
                             @php $item = $row['item']; $none = ! $row['returnable_base']->isPositive(); @endphp
-                            <tr @class(['opacity-50' => $none])>
+                            <tr @class(['opacity-50' => $none]) @unless ($none) data-scan-row data-barcode="{{ $item->product?->barcode }}" data-code="{{ $item->short_code_snapshot }}" @endunless>
                                 <td>
                                     <span class="font-mono text-xs font-semibold text-brand-700">{{ $item->short_code_snapshot }}</span>
                                     <span class="font-medium">{{ $item->name_snapshot }}</span>
@@ -61,7 +62,7 @@
                                 <td>
                                     @unless ($none)
                                         <div class="flex items-center gap-1">
-                                            <input type="text" inputmode="decimal" name="lines[{{ $itemId }}][qty]" value="{{ old('lines.'.$itemId.'.qty') }}" placeholder="0" class="w-20 rounded-md border-gray-300 text-right text-sm tabular" aria-label="Quantity of {{ $item->name_snapshot }} coming back">
+                                            <input type="text" inputmode="decimal" data-scan-qty name="lines[{{ $itemId }}][qty]" value="{{ old('lines.'.$itemId.'.qty') }}" placeholder="0" class="w-20 rounded-md border-gray-300 text-right text-sm tabular" aria-label="Quantity of {{ $item->name_snapshot }} coming back">
                                             <span class="text-xs text-gray-500">of {{ Qty::format((string) $row['returnable_qty']) }} {{ $item->unit_snapshot }}</span>
                                         </div>
                                         @error('lines.'.$itemId.'.qty')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
@@ -76,7 +77,8 @@
                             </tr>
                         @endforeach
                     </x-ui.table>
-                    <p class="mt-2 text-xs text-gray-500">Untick "Restock" for damaged goods: they come back into stock and are written off as damage straight away. Stock goes back to the batches it was sold from. The refund of each line is its share of the invoice, after discounts.</p>
+                    <p x-show="scanMessage" x-text="scanMessage" x-cloak class="mt-2 text-sm text-red-700" role="alert"></p>
+                    <p class="mt-2 text-xs text-gray-500">Scan an item to jump to its quantity. Untick "Restock" for damaged goods: they come back into stock and are written off as damage straight away. Stock goes back to the batches it was sold from. The refund of each line is its share of the invoice, after discounts.</p>
 
                     <div class="mt-6 grid gap-4 sm:grid-cols-2">
                         <x-ui.input name="reason" label="Reason" required maxlength="255" placeholder="Wrong item, damaged, not needed …" />
@@ -100,6 +102,7 @@
                         <x-ui.button type="submit" x-bind:disabled="busy">Take return and print receipt</x-ui.button>
                     </x-slot:footer>
                 </x-ui.card>
+                </div>
             </form>
         @endif
     @endif

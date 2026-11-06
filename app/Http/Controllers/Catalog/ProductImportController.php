@@ -103,7 +103,7 @@ class ProductImportController extends Controller
         $query = $this->applyListQuery(
             Product::query(),
             $request,
-            searchable: ['short_code', 'name', 'name_si', 'aliases', 'sku'],
+            searchable: ['short_code', 'barcode', 'name', 'name_si', 'aliases', 'sku'],
             sortable: ['short_code', 'name', 'created_at', 'updated_at'],
             filters: ProductController::listFilters(),
             defaultSort: 'short_code',

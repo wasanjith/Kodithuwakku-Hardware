@@ -197,13 +197,17 @@ test('returns need pos.refund at the main cashier', function () {
 test('return pages and the Sinhala return receipt render', function () {
     app(Settings::class)->setGroup('receipt', ['language' => 'si']);
 
+    $this->seedProduct->update(['barcode' => '4792081001234']);
     $sale = settledSeedSale($this, '2');
 
     atTerminal($this->pos['mainToken'], $this->pos['owner'])
         ->get(route('pos.returns.create', ['invoice' => $sale->shortNumber()]))
         ->assertOk()
         ->assertSee($sale->invoice_no)
-        ->assertSee('Paddy seed BG 352');
+        ->assertSee('Paddy seed BG 352')
+        // A scan of the item jumps to its quantity box.
+        ->assertSee('data-barcode="4792081001234"', false)
+        ->assertSee('data-scan-qty', false);
 
     takeReturn($this->pos, $sale, [$sale->items->sole()->id => ['qty' => '1', 'restock' => '1']])->assertRedirect();
     $return = SaleReturn::sole();

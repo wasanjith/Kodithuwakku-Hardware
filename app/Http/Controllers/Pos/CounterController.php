@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pos;
 
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\PriceList;
+use App\Domain\Catalog\Models\Product;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Identity\Support\CurrentTerminal;
 use App\Domain\Sales\Enums\PaymentMethod;
@@ -39,8 +40,10 @@ class CounterController extends Controller
                 'can_reprint' => $user->can('pos.reprint'),
                 'can_add_customer' => $user->can('quickAdd', Customer::class),
                 'can_settle' => $terminal->isMainCashier() && $user->can('pos.settle'),
+                'can_link_barcode' => $user->can('linkBarcode', Product::class),
                 'urls' => [
                     'search' => route('api.pos.search'),
+                    'barcode_link' => route('api.barcodes.link'),
                     'cart' => route('api.pos.cart.show'),
                     'sync' => route('api.pos.cart.sync'),
                     'inbox' => route('api.pos.inbox'),

@@ -6,7 +6,7 @@
     $canCost = auth()->user()->can('viewCost', \App\Domain\Catalog\Models\Product::class);
 
     $tabs = [
-        'general' => ['label' => 'General', 'fields' => ['short_code', 'sku', 'name', 'category_id', 'brand_id', 'base_unit_id', 'tax_id', 'description', 'sold_loose', 'opens_into_product_id', 'opens_into_qty']],
+        'general' => ['label' => 'General', 'fields' => ['short_code', 'sku', 'barcode', 'name', 'category_id', 'brand_id', 'base_unit_id', 'tax_id', 'description', 'sold_loose', 'opens_into_product_id', 'opens_into_qty']],
         'units' => ['label' => 'Units & Prices', 'fields' => ['units', 'prices', 'reference_cost', 'min_selling_margin_pct']],
         'variants' => ['label' => 'Variants', 'fields' => ['variants']],
         'names' => ['label' => 'Search & Names', 'fields' => ['name_si', 'name_ta', 'aliases', 'attribute_rows']],
@@ -112,8 +112,14 @@
                     <div>
                         <x-ui.label for="sku">SKU / supplier code</x-ui.label>
                         <input type="text" name="sku" id="sku" x-model="sku" maxlength="50" class="{{ $inputClass }} mt-1 font-mono" autocomplete="off">
-                        <p class="mt-1 text-xs text-gray-500">Optional. Suggested from category + brand, e.g. FER-BAT-001.</p>
+                        <p class="mt-1 text-xs text-gray-500">Optional. Suggested from category + brand, e.g. PLU-SLO-001.</p>
                         <x-ui.field-error name="sku" />
+                    </div>
+                    <div>
+                        <x-ui.label for="barcode">Barcode</x-ui.label>
+                        <input type="text" name="barcode" id="barcode" value="{{ old('barcode', $product->barcode) }}" maxlength="64" data-barcode-field class="{{ $inputClass }} mt-1 font-mono" autocomplete="off" placeholder="Scan the maker's barcode">
+                        <p class="mt-1 text-xs text-gray-500">Optional. Click here and scan the item. One barcode per product.</p>
+                        <x-ui.field-error name="barcode" />
                     </div>
                     <x-ui.select name="tax_id" label="Tax" :options="$taxes" :value="$product->tax_id" placeholder="No tax" />
 

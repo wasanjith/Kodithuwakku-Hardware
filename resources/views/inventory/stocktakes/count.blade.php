@@ -17,21 +17,30 @@
 
     <div
         x-data="stocktakeCount({ url: @js(route('inventory.stocktakes.counts', $stocktake)), total: @js($lines->count()), counted: @js($lines->whereNotNull('counted_qty')->count()) })"
+        @scan-row="filter = ''; onlyOpen = false"
+    >
+    <div
+        x-data="scanRows({ notFound: 'Barcode :code is not on this count sheet.' })"
+        @barcode-scan.window="onScan($event.detail)"
         class="space-y-4"
     >
         <div class="sticky top-16 z-20 -mx-4 flex flex-wrap items-center gap-3 border-b border-gray-200 bg-gray-50/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border">
-            <input type="search" x-model="filter" x-hotkey.f2="$el.focus()" placeholder="Find product (F2)" class="block w-full rounded-md border-gray-300 text-base shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:w-72">
+            <input type="search" x-model="filter" x-hotkey.f2="$el.focus()" placeholder="Scan, or find product (F2)" class="block w-full rounded-md border-gray-300 text-base shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:w-72">
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="onlyOpen" class="size-4 rounded border-gray-300 text-brand-600"> Only not counted</label>
             <span class="ml-auto text-sm text-gray-600"><span class="font-semibold tabular" x-text="counted"></span> of {{ $lines->count() }} counted</span>
             <span x-show="error" x-text="error" x-cloak class="w-full text-sm text-red-700"></span>
+            <span x-show="scanMessage" x-text="scanMessage" x-cloak class="w-full text-sm text-red-700" role="alert"></span>
         </div>
 
         <ul class="divide-y divide-gray-100 rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
             @foreach ($lines as $line)
                 @php
-                    $search = mb_strtolower(($line->variant?->short_code ?? $line->product->short_code).' '.$line->product->name.' '.$line->variant?->name.' '.$line->product->name_si.' '.$line->batch?->lot_no);
+                    $search = mb_strtolower(($line->variant?->short_code ?? $line->product->short_code).' '.$line->product->barcode.' '.$line->product->name.' '.$line->variant?->name.' '.$line->product->name_si.' '.$line->batch?->lot_no);
                 @endphp
                 <li
+                    data-scan-row
+                    data-barcode="{{ $line->product->barcode }}"
+                    data-code="{{ $line->variant?->short_code ?? $line->product->short_code }}"
                     class="flex flex-wrap items-center gap-3 px-4 py-3"
                     x-data="{ value: @js($line->counted_qty !== null ? Qty::format($line->counted_qty) : ''), state: '' }"
                     x-show="matches(@js($search), value)"
@@ -53,6 +62,7 @@
                             min="0"
                             step="any"
                             x-model="value"
+                            data-scan-qty
                             @change="state = 'saving'; state = await save({{ $line->id }}, value)"
                             @keydown.enter.prevent="$el.blur()"
                             class="block w-28 rounded-md border-gray-300 text-right text-lg tabular shadow-sm focus:border-brand-500 focus:ring-brand-500"
@@ -68,6 +78,7 @@
                 </li>
             @endforeach
         </ul>
+    </div>
     </div>
 @endsection
 

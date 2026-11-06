@@ -27,7 +27,7 @@ class ReturnableItems
      */
     public function forSale(Sale $sale): array
     {
-        $items = SaleItem::query()->with('batches')->where('sale_id', $sale->id)->orderBy('line_no')->get();
+        $items = SaleItem::query()->with(['batches', 'product:id,barcode'])->where('sale_id', $sale->id)->orderBy('line_no')->get();
         $itemIds = $items->pluck('id')->all();
 
         $returned = SaleReturnLine::query()

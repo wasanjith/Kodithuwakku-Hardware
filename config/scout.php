@@ -145,7 +145,7 @@ return [
         'index-settings' => [
             Product::class => [
                 'searchableAttributes' => [
-                    'short_code', 'variant_codes', 'name', 'variant_names', 'aliases',
+                    'short_code', 'variant_codes', 'barcode', 'name', 'variant_names', 'aliases',
                     'name_si', 'name_ta', 'brand', 'attributes', 'category', 'category_path',
                 ],
                 'filterableAttributes' => ['category_id', 'category_ids', 'brand_id', 'is_active'],
@@ -153,7 +153,7 @@ return [
                 'rankingRules' => ['words', 'typo', 'proximity', 'attribute', 'exactness', 'sales_velocity_30d:desc'],
                 'typoTolerance' => [
                     'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8],
-                    'disableOnAttributes' => ['short_code', 'variant_codes'],
+                    'disableOnAttributes' => ['short_code', 'variant_codes', 'barcode'],
                 ],
             ],
         ],

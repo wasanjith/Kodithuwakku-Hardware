@@ -129,7 +129,7 @@
                                     {{-- A disabled select is not submitted: order lines keep the ordered unit. --}}
                                     <input type="hidden" :name="`lines[${index}][unit_id]`" :value="line.unit_id" :disabled="! line.po_line_id">
                                 </td>
-                                <td class="py-2 pr-3"><input type="number" :id="`qty-${line.key}`" :name="`lines[${index}][qty]`" x-model="line.qty" min="0" step="any" required class="{{ $inputClass }} w-24 tabular"></td>
+                                <td class="py-2 pr-3"><input type="number" :id="`qty-${line.key}`" :name="`lines[${index}][qty]`" x-model="line.qty" min="0" step="any" required @keydown.enter.prevent="document.getElementById('product-picker')?.focus()" class="{{ $inputClass }} w-24 tabular"></td>
                                 <td class="py-2 pr-3"><input type="number" :name="`lines[${index}][free_qty]`" x-model="line.free_qty" min="0" step="any" class="{{ $inputClass }} w-20 tabular"></td>
                                 <td class="py-2 pr-3"><input type="text" inputmode="decimal" :name="`lines[${index}][unit_cost]`" x-model="line.unit_cost" required placeholder="0.00" class="{{ $inputClass }} w-28 tabular"></td>
                                 <td class="py-2 pr-3"><input type="text" :name="`lines[${index}][lot_no]`" x-model="line.lot_no" maxlength="50" class="{{ $inputClass }} w-28"></td>
@@ -205,6 +205,17 @@
                 message: '',
 
                 addLine(item) {
+                    // Already on the receipt (an order line, or scanned before): go to its quantity.
+                    const existing = this.lines.find((line) => line.product_id === item.id && (line.variant_id ?? null) === (item.variant_id ?? null));
+                    if (existing) {
+                        this.$nextTick(() => {
+                            const input = document.getElementById(`qty-${existing.key}`);
+                            input?.focus();
+                            input?.select();
+                        });
+                        return;
+                    }
+
                     const line = row({
                         product_id: item.id,
                         variant_id: item.variant_id,

@@ -63,11 +63,17 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 
 ### 3.1 Barcodes (main new feature)
 
+*Built in H2 (2026-11-05).*
+
 - `products.barcode` (nullable, **unique**, up to 64 chars, indexed). One barcode per product, as the owner said. EAN-13 / UPC-A / EAN-8 / Code 128 are all just text.
-- **POS:** the search box stays as it is. On Enter, the order is **exact barcode → exact short code → search**. A USB scanner (keyboard mode, sends Enter) and typing both work. Fast keystrokes (< 30 ms apart) are taken as a scan, so a scan never opens the results list.
+- **POS:** the search box stays as it is. On Enter, the order is **exact barcode → exact short code → search**. A USB scanner (keyboard mode, sends Enter) and typing both work. Fast keystrokes (6+ characters, ≤ 50 ms apart, then Enter) are taken as a scan (`resources/js/scanner.js`, one listener for every page). A scan asks the search for **exact matches only** (`exact=1`), so an unknown number never brings "near" matches; a barcode typed by hand (8–14 digits) is looked up the same way.
+- The scanner's Enter **never submits a form**. If the code went into another field (e.g. the GRN line's quantity), that field gets its old value back.
+- A barcode may not be another product's short code, and a short code may not be another product's barcode (the barcode would hide it). A deleted product gives its barcode up.
+- **Scanners must send Enter after the code** (the factory default of most USB scanners). Check this when the scanners are bought.
 - **After a scan** the item is added with qty 1 and the cursor jumps to the **quantity box**: type `12`, Enter, and the cursor goes back to the scan box. Scanning the same item again adds +1. `12*` before a scan also works (as in Citizens).
 - **Unknown barcode:** a beep, then "Barcode 4792… not found". Owner/Manager can **link it to a product** right there (search → pick → saved). Cashiers see a message only. So barcodes are learned while selling and nobody has to type 4,000 barcodes before go-live.
-- Barcode on: product form, product import (new `barcode` column), product list search, GRN lines, stocktake count sheet, returns.
+- Barcode on: product form, product import (new `barcode` column), product list search (+ "No barcode" filter), the product picker on GRN / purchase order / adjustment / supplier return (unknown barcodes can be linked there too), stocktake count sheet and returns (a scan jumps to that row's quantity box).
+- **GRN:** a scanned item that is already on the receipt (from the order, or scanned before) jumps to its quantity instead of adding a second line; Enter in the quantity goes back to the product box instead of saving the draft.
 - Duplicate barcode = refused with the name of the product that already has it.
 - Sounds: short beep when found, low buzz when not found (Web Audio, no files).
 
@@ -146,7 +152,7 @@ Purchasing (PO, GRN, supplier returns, supplier invoice photos), stock ledger (`
 |---|---|
 | **H0** | Copy project, own identity (DB, prefixes, ports, cookies), tests green. *(done 2026-11-05)* |
 | **H1** | Hardware catalogue base: categories + code ranges, new units, English-only, roles (cashier), hardware demo data, logo + shop details. *(done 2026-11-05 except the logo and shop details, waiting for the owner's upload)* |
-| **H2** | **Barcodes**: column, product form/import/list, POS scan flow (scan → qty box), unknown-barcode linking, GRN/stocktake/returns scanning, sounds. |
+| **H2** | **Barcodes**: column, product form/import/list, POS scan flow (scan → qty box), unknown-barcode linking, GRN/stocktake/returns scanning, sounds. *(done 2026-11-05)* |
 | **H3** | Per-counter payment (drawer counters settle their own bills) + counter drawer sessions. |
 | **H4** | Prices: contractor list, customer special prices, bulk price change + history, discount limits. VAT invoices + VAT report. |
 | **H5** | Quotation maker. |

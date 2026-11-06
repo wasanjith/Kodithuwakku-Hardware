@@ -33,6 +33,15 @@ class ProductPolicy
     }
 
     /**
+     * Link an unknown barcode to a product (counter, goods receipt). Owner and Manager;
+     * cashiers only see "not found".
+     */
+    public function linkBarcode(User $user): bool
+    {
+        return $user->can('catalog.manage');
+    }
+
+    /**
      * Bulk import from Excel.
      */
     public function import(User $user): bool

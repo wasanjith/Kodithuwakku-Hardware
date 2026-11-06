@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Catalog;
 
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Catalog\Services\BarcodeRegistry;
 use App\Domain\Catalog\Services\ShortCodeGenerator;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -33,6 +34,7 @@ class SaveProductRequest extends FormRequest
         return [
             'short_code' => ['required', 'string', 'max:20', 'regex:'.self::CODE_PATTERN, $this->uniqueCode($productId, null)],
             'sku' => ['nullable', 'string', 'max:50', Rule::unique('products', 'sku')->ignore($productId)],
+            'barcode' => ['nullable', 'string', 'max:64', $this->freeBarcode($productId)],
             'name' => ['required', 'string', 'max:150'],
             'name_si' => ['nullable', 'string', 'max:150'],
             'name_ta' => ['nullable', 'string', 'max:150'],
@@ -182,6 +184,7 @@ class SaveProductRequest extends FormRequest
         $this->merge([
             'short_code' => mb_strtoupper(trim((string) $this->input('short_code'))),
             'sku' => $this->input('sku') ?: null,
+            'barcode' => BarcodeRegistry::normalise($this->input('barcode')),
             'is_active' => $this->boolean('is_active'),
             'track_batches' => $this->boolean('track_batches'),
             'track_expiry' => $this->boolean('track_expiry'),
@@ -230,11 +233,25 @@ class SaveProductRequest extends FormRequest
         return $data;
     }
 
+    /**
+     * One barcode per product: refused with the name of the product that already has it.
+     */
+    private function freeBarcode(?int $productId): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($productId): void {
+            if (($problem = app(BarcodeRegistry::class)->problem((string) $value, $productId)) !== null) {
+                $fail($problem);
+            }
+        };
+    }
+
     private function uniqueCode(?int $productId, ?int $variantId): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) use ($productId, $variantId): void {
             if (app(ShortCodeGenerator::class)->isTaken((string) $value, $productId, $variantId)) {
                 $fail("Short code {$value} is already used by another product.");
+            } elseif (($owner = app(BarcodeRegistry::class)->owner((string) $value, $productId)) !== null) {
+                $fail("{$value} is the barcode of {$owner->name}. Use a different short code.");
             }
         };
     }

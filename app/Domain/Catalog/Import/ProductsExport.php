@@ -55,6 +55,7 @@ class ProductsExport implements FromArray, ShouldAutoSize, WithHeadings
 
             $values = [
                 'short_code' => $product->short_code,
+                'barcode' => $product->barcode,
                 'name' => $product->name,
                 'name_si' => $product->name_si,
                 'name_ta' => $product->name_ta,

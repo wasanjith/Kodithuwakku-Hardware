@@ -20,6 +20,7 @@ final class ProductImportColumns
     {
         return [
             'short_code' => ['heading' => 'Short Code', 'description' => 'Code staff type at the counter. Leave empty to get the next free code of the category.', 'aliases' => ['code']],
+            'barcode' => ['heading' => 'Barcode', 'description' => "Maker's barcode printed on the item (EAN-13 …). Optional: barcodes can also be scanned in later. Format the column as Text in Excel so long numbers stay whole.", 'aliases' => ['ean', 'barcode_no', 'bar_code']],
             'name' => ['heading' => 'Product Name', 'description' => 'Required. English name. Leave empty on the next rows of the same product to add more pack sizes.'],
             'name_si' => ['heading' => 'Sinhala Name', 'description' => 'Sinhala name.'],
             'name_ta' => ['heading' => 'Tamil Name', 'description' => 'Tamil name.'],

@@ -123,7 +123,14 @@ test('a cancelled stocktake changes nothing', function () {
 });
 
 test('stocktake pages render and sales staff cannot use them', function () {
+    $this->urea->update(['barcode' => '4792081001234']);
     $stocktake = startStocktake();
+
+    // A scan finds the row by its barcode and goes to its count box.
+    $this->actingAs($this->manager)->get(route('inventory.stocktakes.count', $stocktake))
+        ->assertOk()
+        ->assertSee('data-barcode="4792081001234"', false)
+        ->assertSee('data-scan-qty', false);
 
     $this->actingAs($this->manager)->get(route('inventory.stocktakes.index'))->assertOk()->assertSee($stocktake->number);
     $this->actingAs($this->manager)->get(route('inventory.stocktakes.create'))->assertOk();
